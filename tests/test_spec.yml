@@ -1,0 +1,3 @@
+collectors:
+  - type: command
+    arg: "cat tests/test_result.json"

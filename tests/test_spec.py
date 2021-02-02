@@ -1,34 +1,74 @@
-import tempfile
+import io
 
 import pytest
 import pydantic
 
-from headwind.spec import Metric, MetricType
+from headwind.spec import CollectorModel, CollectorType, SpecValidationError, load_spec, Spec
 
 
-def test_metric() -> None:
-    m = Metric(type=MetricType.Python, arg="my.module.func", name="x")
-    assert m is not None
-    with pytest.raises(pydantic.error_wrappers.ValidationError):
-        m = Metric(type="NOPE", arg="my.module.func", name="x")
+def test_collector() -> None:
+    c = CollectorModel(type=CollectorType.Python, arg="my.module.func")
+    assert c is not None
 
     with pytest.raises(pydantic.error_wrappers.ValidationError):
-        m = Metric(type="NOPE", arg=42, name="x")
+        CollectorModel(type="NOPE", arg="my.module.func")
 
     with pytest.raises(pydantic.error_wrappers.ValidationError):
-        m = Metric(type=MetricType.Command, arg="nonexistant file", name="x")
+        CollectorModel(type="NOPE", arg=42)
 
-    with tempfile.NamedTemporaryFile() as f:
-        m = Metric(type=MetricType.Command, arg=f.name, name="x")
+    c = CollectorModel(type="python", arg="some-module")
+    assert c is not None
 
-
-def test_metric_context() -> None:
-    c = {"a": 2, "b": "something"}
-    m = Metric(type=MetricType.Python, arg="blubb", name="works", context=c)
-
-    class Custom:
-        pass
-
-    c = {"a": Custom(), "b": "something"}
     with pytest.raises(pydantic.error_wrappers.ValidationError):
-        m = Metric(type=MetricType.Python, arg="blubb", name="works", context=c)
+        CollectorModel(type="invali", arg="some-module")
+
+
+def test_spec() -> None:
+    s = Spec(collectors=[{'type': 'command', 'arg': 'echo 42'}])
+    assert s is not None
+
+
+def test_load_spec() -> None:
+    buf = io.StringIO()
+    buf.write("")
+
+    with pytest.raises(ValueError):
+        load_spec(buf)
+
+    buf = io.StringIO()
+    buf.write("wrong: 54")
+    buf.seek(0)
+
+    with pytest.raises(SpecValidationError):
+        load_spec(buf)
+
+    buf = io.StringIO()
+    buf.write(
+        """
+collectors:
+    - type: python
+      arg: some.module
+""".strip()
+    )
+    buf.seek(0)
+
+    s = load_spec(buf)
+
+    assert len(s.collectors) == 1
+
+    assert s.collectors[0].type == CollectorType.Python
+    assert s.collectors[0].arg == "some.module"
+
+    buf = io.StringIO()
+    buf.write(
+        """
+beep: "nope"
+collectors:
+    - type: python
+      arg: some.module
+""".strip()
+    )
+    buf.seek(0)
+
+    with pytest.raises(SpecValidationError):
+        load_spec(buf)

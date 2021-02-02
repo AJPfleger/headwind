@@ -1,0 +1,15 @@
+{
+  "metrics": [
+    {
+      "name": "random_metric",
+      "group": "Group 1",
+      "value": 42.42,
+      "unit": "plumbus"
+    },
+    {
+      "name": "random_metric2",
+      "value": 5848,
+      "unit": "plumbus"
+    }
+  ]
+}

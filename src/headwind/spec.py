@@ -3,49 +3,62 @@ from enum import Enum
 from typing import Any, Dict, IO, List, Optional, Union
 
 from pydantic import BaseModel, validator
+import pydantic
 from pydantic.class_validators import root_validator
 import json
 import yaml
 
 
-class MetricType(Enum):
-    Python = 1
-    Command = 2
+class CollectorType(str, Enum):
+    Python = "python"
+    Command = "command"
 
 
-class Metric(BaseModel):
-    type: MetricType
+class CollectorModel(BaseModel):
+    type: CollectorType
     arg: str
-    name: str
-    context: Dict[str, Any] = {}
 
-    @validator("arg")
-    def arg_exists(cls, v: str, values: Any, **kwargs: Any) -> Union[Path, str]:
-        assert "type" in values
-        if values["type"] == MetricType.Command:
-            p = Path(v)
-            assert p.exists()
-            return p
-        return v
-
-    @validator("context")
-    def is_json_serializable(cls, v: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
-        try:
-            s = json.dumps(v)
-            return v
-        except:
-            raise ValueError("Context is not JSON serializable")
+    class Config:
+        extra = "forbid"
 
 
 class Spec(BaseModel):
-    metric: List[Metric]
+    collectors: List[CollectorModel]
 
-    @validator("metric")
-    def at_least_one_metric(cls, v: List[Metric], **kwargs: Any) -> List[Metric]:
-        assert len(v) > 0
+    class Config:
+        extra = "forbid"
+
+    @validator("collectors")
+    def at_least_one_collector(
+        cls, v: List[CollectorModel], **kwargs: Any
+    ) -> List[CollectorModel]:
+        assert len(v) > 0, "At least one collector needs to be given."
         return v
+
+
+SpecValidationError = pydantic.error_wrappers.ValidationError
 
 
 def load_spec(file: IO[str]) -> Spec:
     values = yaml.safe_load(file)
+    if not isinstance(values, dict):
+        raise ValueError("Invalid spec")
+
     return Spec(**values)
+
+
+class Metric(BaseModel):
+    name: str
+    group: Optional[str]
+    value: float
+    unit: str
+
+    @validator("group")
+    def _(cls, v: Optional[str], **kwargs: Any) -> Optional[str]:
+        if v is not None:
+            assert len(v) > 0, "Group name cannot be empty"
+        return v
+
+
+class CollectorResult(BaseModel):
+    metrics: List[Metric]
