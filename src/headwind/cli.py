@@ -1,4 +1,5 @@
 from concurrent.futures import wait
+from datetime import datetime
 from pathlib import Path
 
 import typer
@@ -6,7 +7,7 @@ from headwind.collector import Collector, CollectorError
 from headwind.executor import make_executor
 from wasabi import msg
 
-from headwind.spec import load_spec, CollectorResult
+from headwind.spec import load_spec, CollectorResult, Run, Commit
 
 app = typer.Typer(add_completion=False)
 
@@ -42,6 +43,18 @@ def collect_cmd(spec_file: typer.FileText, jobs: int = typer.Option(1, "--jobs",
             return
 
     msg.good("Collection completed")
+    print(results)
+
+    run = Run(
+        commit=Commit(hash="x" * 40),
+        parent=Commit(hash="x" * 40),
+        branch="master",
+        date=datetime.now(),
+        results=results,
+        context={},
+    )
+
+    # for result in results:
 
 # @app.command("schema")
 # def schema() -> None:

@@ -1,8 +1,9 @@
+from datetime import datetime
 from pathlib import Path
 from enum import Enum
 from typing import Any, Dict, IO, List, Optional, Union
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, validator, constr, conlist
 import pydantic
 from pydantic.class_validators import root_validator
 import json
@@ -61,4 +62,31 @@ class Metric(BaseModel):
 
 
 class CollectorResult(BaseModel):
-    metrics: List[Metric]
+    metrics: conlist(Metric, min_items=1)
+
+
+class Commit(BaseModel):
+    hash: constr(min_length=40, max_length=40)
+
+    # @validator("hash")
+    # def _(cls, v: str, **kwargs: Any) -> str:
+    #     assert len(v) == 40, "Commit hash has invalid length"
+    #     returned v
+
+
+class Run(BaseModel):
+    commit: Commit
+    parent: Commit
+    branch: constr(min_length=1)
+    date: datetime
+    results: conlist(Metric, min_items=1)
+
+    context: Dict[str, Any]
+
+    @validator("context")
+    def _(cls, v: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+        try:
+            json.dumps(v)
+            return v
+        except (TypeError, ValueError, OverflowError) as e:
+            raise e
