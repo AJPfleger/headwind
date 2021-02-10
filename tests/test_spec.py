@@ -1,9 +1,20 @@
 import io
+from datetime import datetime
 
 import pytest
 import pydantic
 
-from headwind.spec import CollectorModel, CollectorType, SpecValidationError, load_spec, Spec
+from headwind.spec import (
+    CollectorModel,
+    CollectorType,
+    SpecValidationError,
+    load_spec,
+    Spec,
+    CollectorResult,
+    Metric,
+    Run,
+    Commit,
+)
 
 
 def test_collector() -> None:
@@ -24,7 +35,7 @@ def test_collector() -> None:
 
 
 def test_spec() -> None:
-    s = Spec(collectors=[{'type': 'command', 'arg': 'echo 42'}])
+    s = Spec(collectors=[{"type": "command", "arg": "echo 42"}])
     assert s is not None
 
 
@@ -72,3 +83,41 @@ collectors:
 
     with pytest.raises(SpecValidationError):
         load_spec(buf)
+
+
+def test_collector_result() -> None:
+    # VALID
+    CollectorResult(metrics=[Metric(name="a.metric", value=42, unit="X")])
+
+    with pytest.raises(SpecValidationError):
+        # duplicate name
+        CollectorResult(
+            metrics=[
+                Metric(name="a.metric", value=42, unit="X"),
+                Metric(name="a.metric", value=43, unit="X"),
+            ]
+        )
+
+
+def test_run() -> None:
+    # VALID
+    Run(
+        commit=Commit(hash="X" * 40),
+        parent=Commit(hash="X" * 40),
+        branch="main",
+        date=datetime.now(),
+        results=[Metric(name="a.metric", value=42, unit="X")],
+    )
+
+    with pytest.raises(SpecValidationError):
+        # duplicate name
+        Run(
+            commit=Commit(hash="X" * 40),
+            parent=Commit(hash="X" * 40),
+            branch="main",
+            date=datetime.now(),
+            results=[
+                Metric(name="a.metric", value=42, unit="X"),
+                Metric(name="a.metric", value=42, unit="X"),
+            ],
+        )

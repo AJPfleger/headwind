@@ -1,11 +1,9 @@
 from datetime import datetime
-from pathlib import Path
 from enum import Enum
-from typing import Any, Dict, IO, List, Optional, Union
+from typing import Any, Dict, IO, List, Optional
 
-from pydantic import BaseModel, validator, constr, conlist
+from pydantic import BaseModel, validator, Field
 import pydantic
-from pydantic.class_validators import root_validator
 import json
 import yaml
 
@@ -62,31 +60,38 @@ class Metric(BaseModel):
 
 
 class CollectorResult(BaseModel):
-    metrics: conlist(Metric, min_items=1)
+    metrics: List[Metric] = Field(..., min_items=1)
+
+    @validator("metrics")
+    def _(cls, v: List[Metric], **kwargs: Any) -> List[Metric]:
+        names = set(m.name for m in v)
+        assert len(names) == len(v), "Metrics have duplicate names"
+        return v
 
 
 class Commit(BaseModel):
-    hash: constr(min_length=40, max_length=40)
-
-    # @validator("hash")
-    # def _(cls, v: str, **kwargs: Any) -> str:
-    #     assert len(v) == 40, "Commit hash has invalid length"
-    #     returned v
+    hash: str = Field(min_length=40, max_length=40)
 
 
 class Run(BaseModel):
     commit: Commit
     parent: Commit
-    branch: constr(min_length=1)
+    branch: str = Field(..., min_length=1)
     date: datetime
-    results: conlist(Metric, min_items=1)
+    results: List[Metric] = Field(..., min_items=1)
 
-    context: Dict[str, Any]
+    context: Dict[str, Any] = {}
 
     @validator("context")
-    def _(cls, v: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+    def validate_context(cls, v: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
         try:
             json.dumps(v)
             return v
         except (TypeError, ValueError, OverflowError) as e:
             raise e
+
+    @validator("results")
+    def validate_results(cls, v: List[Metric], **kwargs: Any) -> List[Metric]:
+        names = set(m.name for m in v)
+        assert len(names) == len(v), "Metrics have duplicate names"
+        return v
