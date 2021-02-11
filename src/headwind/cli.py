@@ -1,7 +1,12 @@
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
 
 import typer
 from headwind.collector import CollectorError, run_collectors
+from headwind.config import find_config_file, Config
+from headwind.git import get_current_commit, get_parent_commit
+from headwind.storage import Storage
 from wasabi import msg
 
 from headwind.spec import load_spec, Run, Commit
@@ -16,9 +21,28 @@ def publish() -> None:
 
 @app.command("collect")
 def collect_cmd(
-    spec_file: typer.FileText, jobs: int = typer.Option(1, "--jobs", "-j")
+    spec_file: typer.FileText,
+    jobs: int = typer.Option(1, "--jobs", "-j"),
+    commit_in: str = typer.Option(
+        get_current_commit().hash, "--commit", show_default=True
+    ),
+    parent_in: str = typer.Option(
+        get_parent_commit().hash, "--parent", show_default=True
+    ),
+    config_file: Optional[Path] = None,
 ) -> None:
+    commit = Commit(hash=str(commit_in))
+    parent = Commit(hash=str(parent_in))
+    if config_file is None:
+        config_file = find_config_file()
+
+    config = Config.load(config_file)
+
     msg.info(f"#jobs: {jobs}")
+    msg.info(f"on commit:     {commit}")
+    msg.info(f"parent commit: {parent}")
+    msg.info(f"loading config from {config_file}")
+
     if jobs > 1:
         msg.warn(
             "If you're running benchmarks from the collect call,"
@@ -51,7 +75,11 @@ def collect_cmd(
         context={},
     )
 
-    print(run)
+    # print(run)
+
+    storage = Storage(config.storage_dir)
+
+    storage.store_run(run)
 
     # for result in results:
 
