@@ -1,6 +1,7 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, IO, List, Optional
+from pathlib import Path
+from typing import Any, Dict, IO, List, Optional, cast
 
 from pydantic import BaseModel, validator, Field
 import pydantic
@@ -23,6 +24,8 @@ class CollectorModel(BaseModel):
 
 class Spec(BaseModel):
     collectors: List[CollectorModel]
+    spec_file: Path
+    storage_dir: Path
 
     class Config:
         extra = "forbid"
@@ -34,6 +37,19 @@ class Spec(BaseModel):
         assert len(v) > 0, "At least one collector needs to be given."
         return v
 
+    @validator("spec_file")
+    def validate_spec_file(cls, value: Path) -> Path:
+        assert value.exists()
+        return value
+
+    @validator("storage_dir")
+    def validate_storage_dir(cls, value: Path, values: Dict[str, Any]) -> Path:
+        path = cast(Path, values["spec_file"]).parent / value
+        path = path.absolute()
+        assert path.exists(), f"Storage path not found: {path}"
+        assert path.is_dir(), f"Path {path} is not a directory"
+        return path
+
 
 SpecValidationError = pydantic.error_wrappers.ValidationError
 
@@ -43,6 +59,7 @@ def load_spec(file: IO[str]) -> Spec:
     if not isinstance(values, dict):
         raise ValueError("Invalid spec")
 
+    values["spec_file"] = file.name
     return Spec(**values)
 
 

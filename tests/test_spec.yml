@@ -1,3 +1,4 @@
 collectors:
   - type: command
     arg: "cat tests/test_result.json"
+storage_dir: ../storage
