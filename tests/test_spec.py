@@ -1,5 +1,7 @@
 import io
 from datetime import datetime
+from pathlib import Path
+from unittest.mock import Mock, mock_open
 
 import pytest
 import pydantic
@@ -34,55 +36,57 @@ def test_collector() -> None:
         CollectorModel(type="invali", arg="some-module")
 
 
-def test_spec() -> None:
-    s = Spec(collectors=[{"type": "command", "arg": "echo 42"}])
-    assert s is not None
+# def test_spec() -> None:
+#     s = Spec(collectors=[{"type": "command", "arg": "echo 42"}])
+#     assert s is not None
 
 
-def test_load_spec() -> None:
-    buf = io.StringIO()
-    buf.write("")
+def test_load_spec(tmp_path: Path) -> None:
+    # buf = io.StringIO()
+    # buf.write("")
 
-    with pytest.raises(ValueError):
-        load_spec(buf)
+    # m = Mock(buf)
+    spec_file = tmp_path / "spec.yml"
+    spec_file.write_text("blubb")
 
-    buf = io.StringIO()
-    buf.write("wrong: 54")
-    buf.seek(0)
+    with mock_open(read_data="")() as buf:
+        buf.name = tmp_path / "spec.yml"
+        with pytest.raises(ValueError):
+            load_spec(buf)
 
-    with pytest.raises(SpecValidationError):
-        load_spec(buf)
+    with mock_open(read_data="wrong: 54")() as buf:
+        buf.name = tmp_path / "spec.yml"
+        with pytest.raises(ValueError):
+            load_spec(buf)
 
-    buf = io.StringIO()
-    buf.write(
-        """
+    sin = """
 collectors:
     - type: python
       arg: some.module
-""".strip()
-    )
-    buf.seek(0)
+storage_dir: path
+"""
 
-    s = load_spec(buf)
+    with mock_open(read_data=sin.strip())() as buf:
+        buf.name = tmp_path / "spec.yml"
+        s = load_spec(buf)
 
     assert len(s.collectors) == 1
 
     assert s.collectors[0].type == CollectorType.Python
     assert s.collectors[0].arg == "some.module"
 
-    buf = io.StringIO()
-    buf.write(
-        """
+    sin =  """
 beep: "nope"
 collectors:
     - type: python
       arg: some.module
-""".strip()
-    )
-    buf.seek(0)
+storage_dir: path
+"""
 
-    with pytest.raises(SpecValidationError):
-        load_spec(buf)
+    with mock_open(read_data=sin.strip())() as buf:
+        buf.name = tmp_path / "spec.yml"
+        with pytest.raises(SpecValidationError):
+            load_spec(buf)
 
 
 def test_collector_result() -> None:

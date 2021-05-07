@@ -3,7 +3,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, IO, List, Optional, cast
 
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, validator, Field, root_validator
 import pydantic
 import json
 import yaml
@@ -37,18 +37,34 @@ class Spec(BaseModel):
         assert len(v) > 0, "At least one collector needs to be given."
         return v
 
-    @validator("spec_file")
-    def validate_spec_file(cls, value: Path) -> Path:
-        assert value.exists()
-        return value
+    # @validator("spec_file")
+    # def validate_spec_file(cls, value: Path) -> Path:
+    #     assert value.exists()
+    #     return value
+    #
+    # @validator("storage_dir")
+    # def validate_storage_dir(cls, value: Path, values: Dict[str, Any]) -> Path:
+    #     path = cast(Path, values["spec_file"]).parent / value
+    #     path = path.absolute()
+    #     # assert path.exists(), f"Storage path not found: {path}"
+    #     if not path.exists():
+    #         path.mkdir(parents=True)
+    #     assert path.is_dir(), f"Path {path} is not a directory"
+    #     return path
 
-    @validator("storage_dir")
-    def validate_storage_dir(cls, value: Path, values: Dict[str, Any]) -> Path:
-        path = cast(Path, values["spec_file"]).parent / value
+    @root_validator
+    def root_validator(slc, values: Dict[str, Any]):
+        assert "spec_file" in values
+        spec_file = cast(Path, values["spec_file"])
+        assert spec_file.exists()
+        assert "storage_dir" in values
+        path = spec_file.parent / values["storage_dir"]
         path = path.absolute()
-        assert path.exists(), f"Storage path not found: {path}"
+        if not path.exists():
+            path.mkdir(parents=True)
         assert path.is_dir(), f"Path {path} is not a directory"
-        return path
+        values["storage_dir"] = path
+        return values
 
 
 SpecValidationError = pydantic.error_wrappers.ValidationError
@@ -87,7 +103,7 @@ class CollectorResult(BaseModel):
 
 
 class Commit(BaseModel):
-    hash: str = Field(min_length=40, max_length=40)
+    hash: Optional[str] = Field(min_length=40, max_length=40)
 
 
 class Run(BaseModel):
