@@ -17,11 +17,12 @@ app = typer.Typer(add_completion=False)
 @app.command()
 def publish(
     spec_file: typer.FileText,
+    output: Path,
 ) -> None:
     spec = load_spec(spec_file)
     storage = Storage(spec.storage_dir)
 
-    make_report(storage)
+    make_report(storage, output)
 
 
 @app.command("collect")
