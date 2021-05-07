@@ -55,12 +55,13 @@ def stored_runs(dummy_runs, tmp_path) -> Storage:
     return storage
 
 def test_iterate(dummy_runs: List[Run], stored_runs: Storage):
-    act = list(stored_runs.iterate(dummy_runs[9].commit))
-    exp = list(reversed(dummy_runs[:10]))
+    mid = int(len(dummy_runs)/2)
+    act = list(stored_runs.iterate(dummy_runs[mid-1].commit))
+    exp = list(reversed(dummy_runs[:mid]))
     assert exp == act
 
     act = list(stored_runs.iterate(dummy_runs[-1].commit))
-    exp = list(reversed(dummy_runs[10:]))
+    exp = list(reversed(dummy_runs[mid:]))
     assert exp == act
 
 def test_iterate_all(dummy_runs: List[Run], stored_runs: Storage):
