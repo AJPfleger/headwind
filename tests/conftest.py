@@ -5,6 +5,7 @@ import pytest
 import random
 
 from headwind.spec import Commit, Run, Metric
+from headwind.storage import Storage
 
 
 def make_commit() -> Commit:
@@ -15,13 +16,14 @@ def dummy_runs():
     random.seed(42)
     runs = []
     for branch in ("main", "feature"):
-        parent = Commit(hash=None)
-        for _ in range(100):
+        # parent = Commit(hash=None)
+        for _ in range(10000):
             commit = make_commit()
 
             run = Run(
                 commit=commit,
-                parent=parent,
+                # parent=parent,
+                parent=Commit(hash=None), # this should be determined automatically
                 branch=branch,
                 date=datetime.now(),
                 results=[
@@ -34,6 +36,16 @@ def dummy_runs():
             )
 
             runs.append(run)
-            parent = commit
+            # parent = commit
 
     return runs
+
+@pytest.fixture
+def stored_runs(dummy_runs, tmp_path) -> Storage:
+    storage_dir = tmp_path / "storage"
+    storage_dir.mkdir()
+
+    storage = Storage(storage_dir)
+    for run in dummy_runs:
+        storage.store_run(run)
+    return storage

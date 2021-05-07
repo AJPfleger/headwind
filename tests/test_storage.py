@@ -44,16 +44,6 @@ def test_storage(dummy_run: Run, tmp_path: Path) -> None:
     with pytest.raises(AssertionError):
         storage.get(Commit(hash="J"*40))
 
-@pytest.fixture
-def stored_runs(dummy_runs, tmp_path) -> Storage:
-    storage_dir = tmp_path / "storage"
-    storage_dir.mkdir()
-
-    storage = Storage(storage_dir)
-    for run in dummy_runs:
-        storage.store_run(run)
-    return storage
-
 def test_iterate(dummy_runs: List[Run], stored_runs: Storage):
     mid = int(len(dummy_runs)/2)
     act = list(stored_runs.iterate(dummy_runs[mid-1].commit))
@@ -74,9 +64,32 @@ def test_find_branch_tips(dummy_runs: List[Run], stored_runs: Storage):
     assert tips["main"] == dummy_runs[int(len(dummy_runs)/2-1)].commit
     assert tips["feature"] == dummy_runs[-1].commit
 
+    assert stored_runs.find_branch_tips() == stored_runs.find_branch_tips_slow()
+
 def test_dataframe(dummy_runs: List[Run], stored_runs: Storage):
     print()
     df = stored_runs.dataframe()
 
     print(df.head())
     print(df.tail())
+
+def test_get_branch_tip(stored_runs: Storage, dummy_runs: List[Run]) -> None:
+    mid = int(len(dummy_runs) / 2)
+    exp1 = dummy_runs[mid-1]
+    exp2 = dummy_runs[-1]
+
+    act1 = stored_runs.get_branch_tip(exp1.branch)
+    assert act1 == exp1.commit
+
+    act2 = stored_runs.get_branch_tip(exp2.branch)
+    assert act2 == exp2.commit
+
+    slow = stored_runs.find_branch_tips_slow()
+
+    for branch, exp in slow.items():
+        act = stored_runs.get_branch_tip(branch)
+        assert act == exp
+
+
+def test_get_branches(stored_runs: Storage) -> None:
+    assert stored_runs.get_branches() == ["main", "feature"]
