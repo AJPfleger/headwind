@@ -103,12 +103,13 @@ class CollectorResult(BaseModel):
 
 
 class Commit(BaseModel):
-    hash: Optional[str] = Field(min_length=40, max_length=40)
+    date: datetime
+    hash: str = Field(min_length=40, max_length=40)
 
 
 class Run(BaseModel):
     commit: Commit
-    parent: Commit
+    parent: Optional[Commit]
     branch: str = Field(..., min_length=1)
     date: datetime
     results: List[Metric] = Field(..., min_items=1)

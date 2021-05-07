@@ -1,20 +1,27 @@
 from datetime import datetime
+from pathlib import Path
 
 import typer
 from headwind.collector import CollectorError, run_collectors
 from headwind.git import get_current_commit, get_parent_commit, get_branch
 from headwind.storage import Storage
-from wasabi import msg
-
+from headwind.test import generate_dummy_data
 from headwind.spec import load_spec, Run, Commit
+from headwind.report import make_report
 
+from wasabi import msg
 
 app = typer.Typer(add_completion=False)
 
 
 @app.command()
-def publish() -> None:
-    raise NotImplementedError()
+def publish(
+    spec_file: typer.FileText,
+) -> None:
+    spec = load_spec(spec_file)
+    storage = Storage(spec.storage_dir)
+
+    make_report(storage)
 
 
 @app.command("collect")
@@ -27,9 +34,7 @@ def collect_cmd(
     parent_in: str = typer.Option(
         get_parent_commit().hash, "--parent", show_default=True
     ),
-    branch: str = typer.Option(
-        get_branch(), "--branch", show_default=True
-    ),
+    branch: str = typer.Option(get_branch(), "--branch", show_default=True),
 ) -> None:
     commit = Commit(hash=str(commit_in))
     parent = Commit(hash=str(parent_in))
@@ -78,6 +83,16 @@ def collect_cmd(
 
     # for result in results:
 
+
+@app.command()
+def make_test_data(spec_file: typer.FileText, n: int = typer.Option(1, "-n")):
+    runs = generate_dummy_data(42, n, ["main", "feature_a", "feature_b"])
+
+    spec = load_spec(spec_file)
+    storage = Storage(spec.storage_dir)
+
+    for run in runs:
+        storage.store_run(run)
 
 # @app.command("schema")
 # def schema() -> None:

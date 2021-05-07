@@ -1,7 +1,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Iterator, Dict, List
+from typing import Iterator, Dict, List, Optional
 
 import yaml
 import pandas
@@ -33,7 +33,6 @@ class Storage:
         with self._get_branch_file(run.branch).open("w") as fh:
             fh.write(run.commit.json(indent=2))
 
-
     def get(self, commit: Commit) -> Run:
         filename = self._make_filename(commit)
         file = self.base_dir / filename
@@ -44,24 +43,28 @@ class Storage:
 
     def iterate_all(self) -> Iterator[Run]:
         for f in sorted(self.base_dir.iterdir()):
-            if not f.is_file(): continue
-            if f.name.startswith("branch_"): continue
+            if not f.is_file():
+                continue
+            if f.name.startswith("branch_"):
+                continue
             with f.open("r") as fh:
                 yield Run(**json.load(fh))
 
     def _get_branch_file(self, branch: str) -> Path:
         return self.base_dir / f"branch_{branch}.json"
 
-    def get_branch_tip(self, branch: str) -> Commit:
+    def get_branch_tip(self, branch: str) -> Optional[Commit]:
         filename = self._get_branch_file(branch)
-        if not filename.exists(): return Commit(hash=None)
+        if not filename.exists():
+            return None
         with filename.open("r") as fh:
             return Commit(**json.load(fh))
 
     def get_branches(self) -> List[str]:
         out = []
         for f in self.base_dir.iterdir():
-            if not f.name.startswith("branch_"): continue
+            if not f.name.startswith("branch_"):
+                continue
             m = re.match(r"^branch_(.*).json$", f.name)
             out.append(m.group(1))
             # out.append(f.read_text().strip())
@@ -74,7 +77,7 @@ class Storage:
         by_parent = {}
         origins: List[Run] = []
         for run in self.iterate_all():
-            if run.parent.hash is None:
+            if run.parent is None:
                 origins.append(run)
             else:
                 by_parent[run.parent.hash] = run
@@ -84,7 +87,7 @@ class Storage:
         for origin in origins:
             candidate: Run = origin
             error = True
-            for _ in range(100000): # some large number for protection
+            for _ in range(100000):  # some large number for protection
                 next_candidate = by_parent.get(candidate.commit.hash)
                 # print("candidate:", candidate.commit.hash, "next:", next_candidate)
                 if next_candidate is None:
@@ -97,11 +100,10 @@ class Storage:
 
         return tips
 
-
     def iterate(self, start: Commit) -> Iterator[Run]:
         current = self.get(start)
         yield current
-        while current.parent.hash is not None:
+        while current.parent is not None:
             current = self.get(current.parent)
             yield current
 
@@ -109,18 +111,17 @@ class Storage:
         tips = self.find_branch_tips()
         tip: Commit
 
-
         def iterator() -> Iterator[Dict[str, float]]:
             for tip in tips.values():
                 for run in self.iterate(tip):
                     # for m in run.results:
                     #     print(m.name)
-                    d =  dict([(m.name, m.value) for m in run.results])
+                    d = dict([(m.name, m.value) for m in run.results])
                     d["branch"] = run.branch
                     d["commit"] = run.commit.hash
-                    d["parent"] = run.parent.hash
+                    d["date"] = run.commit.date
+                    d["parent"] = run.parent.hash if run.parent is not None else None
                     yield d
 
         df = pandas.DataFrame.from_records(iterator())
         return df
-

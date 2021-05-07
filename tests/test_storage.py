@@ -9,15 +9,15 @@ from headwind.storage import Storage
 
 
 def test_make_filename() -> None:
-    act = Storage._make_filename(Commit(hash="ABCDEFG" + "Y" * 33))
+    act = Storage._make_filename(Commit(hash="ABCDEFG" + "Y" * 33, date=datetime.now()))
     assert "ABCDEFG" + "Y" * 33 + ".json" == act
 
 
 @pytest.fixture
 def dummy_run() -> Run:
     return Run(
-        commit=Commit(hash="X" * 40),
-        parent=Commit(hash="X" * 40),
+        commit=Commit(hash="X" * 40, date=datetime.now()),
+        parent=Commit(hash="X" * 40, date=datetime.now()),
         branch="main",
         date=datetime.now(),
         results=[Metric(name="a.metric", value=42, unit="X")],
@@ -37,16 +37,16 @@ def test_storage(dummy_run: Run, tmp_path: Path) -> None:
     raw = exp_file.read_text()
     assert raw == dummy_run.json(indent=2)
 
-
     run_read = storage.get(dummy_run.commit)
     assert run_read == dummy_run
 
     with pytest.raises(AssertionError):
-        storage.get(Commit(hash="J"*40))
+        storage.get(Commit(hash="J" * 40, date=datetime.now()))
+
 
 def test_iterate(dummy_runs: List[Run], stored_runs: Storage):
-    mid = int(len(dummy_runs)/2)
-    act = list(stored_runs.iterate(dummy_runs[mid-1].commit))
+    mid = int(len(dummy_runs) / 2)
+    act = list(stored_runs.iterate(dummy_runs[mid - 1].commit))
     exp = list(reversed(dummy_runs[:mid]))
     assert exp == act
 
@@ -54,17 +54,20 @@ def test_iterate(dummy_runs: List[Run], stored_runs: Storage):
     exp = list(reversed(dummy_runs[mid:]))
     assert exp == act
 
+
 def test_iterate_all(dummy_runs: List[Run], stored_runs: Storage):
     exp = sorted(dummy_runs, key=lambda r: r.commit.hash)
     act = list(stored_runs.iterate_all())
     assert exp == act
 
+
 def test_find_branch_tips(dummy_runs: List[Run], stored_runs: Storage):
     tips = stored_runs.find_branch_tips()
-    assert tips["main"] == dummy_runs[int(len(dummy_runs)/2-1)].commit
+    assert tips["main"] == dummy_runs[int(len(dummy_runs) / 2 - 1)].commit
     assert tips["feature"] == dummy_runs[-1].commit
 
     assert stored_runs.find_branch_tips() == stored_runs.find_branch_tips_slow()
+
 
 def test_dataframe(dummy_runs: List[Run], stored_runs: Storage):
     print()
@@ -73,9 +76,10 @@ def test_dataframe(dummy_runs: List[Run], stored_runs: Storage):
     print(df.head())
     print(df.tail())
 
+
 def test_get_branch_tip(stored_runs: Storage, dummy_runs: List[Run]) -> None:
     mid = int(len(dummy_runs) / 2)
-    exp1 = dummy_runs[mid-1]
+    exp1 = dummy_runs[mid - 1]
     exp2 = dummy_runs[-1]
 
     act1 = stored_runs.get_branch_tip(exp1.branch)

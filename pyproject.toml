@@ -20,6 +20,7 @@ typer = "^0.3.2"
 wasabi = "^0.8.2"
 pandas = "^1.2.4"
 matplotlib = "^3.4.1"
+numpy = "^1.20.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.2"

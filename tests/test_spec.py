@@ -75,7 +75,7 @@ storage_dir: path
     assert s.collectors[0].type == CollectorType.Python
     assert s.collectors[0].arg == "some.module"
 
-    sin =  """
+    sin = """
 beep: "nope"
 collectors:
     - type: python
@@ -106,8 +106,8 @@ def test_collector_result() -> None:
 def test_run() -> None:
     # VALID
     Run(
-        commit=Commit(hash="X" * 40),
-        parent=Commit(hash="X" * 40),
+        commit=Commit(hash="X" * 40, date=datetime.now()),
+        parent=Commit(hash="X" * 40, date=datetime.now()),
         branch="main",
         date=datetime.now(),
         results=[Metric(name="a.metric", value=42, unit="X")],
