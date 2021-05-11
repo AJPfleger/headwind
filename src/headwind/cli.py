@@ -22,6 +22,9 @@ def publish(
     spec = load_spec(spec_file)
     storage = Storage(spec.storage_dir)
 
+    if not output.exists():
+        output.mkdir(parents=True)
+
     make_report(storage, output)
 
 

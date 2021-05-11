@@ -4,6 +4,13 @@ from headwind.storage import Storage
 
 import matplotlib.pyplot as plt
 import numpy as np
+import jinja2
+
+def make_environment() -> jinja2.Environment:
+    env = jinja2.Environment(loader=jinja2.PackageLoader(package_name="headwind"))
+
+    return env
+
 
 def make_report(storage: Storage, output: Path) -> None:
     print(storage.get_branches())
@@ -13,6 +20,12 @@ def make_report(storage: Storage, output: Path) -> None:
         plot_dir.mkdir(parents=True)
 
     df = storage.dataframe()
+
+    env = make_environment()
+
+    # start page
+    tpl = env.get_template("index.html.j2")
+    (output / "index.html").write_text(tpl.render())
 
 
     # print(df.columns)
