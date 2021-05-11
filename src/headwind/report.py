@@ -86,6 +86,10 @@ def group_url(group: str) -> Path:
     return url_for(Path("metric") / group)
 
 
+def is_group_active(group: str) -> bool:
+    return str(url_for(current_url)).startswith(str(group_url(group)))
+
+
 def make_environment() -> jinja2.Environment:
     env = jinja2.Environment(loader=jinja2.PackageLoader(package_name="headwind"))
 
@@ -95,6 +99,7 @@ def make_environment() -> jinja2.Environment:
 
     env.globals["url_for"] = url_for
     env.globals["current_url"] = lambda: current_url
+    env.globals["is_group_active"] = is_group_active
 
     return env
 

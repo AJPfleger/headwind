@@ -26,6 +26,8 @@
                             " href="{{ group_url(grp) }}">{{ grp }}
                             </a>
                             
+                            {% if is_group_active(grp) %}
+
                             <ul class="menu-list">
                             {% for metric in mtrcs %}
                                 <li><a class="
@@ -36,6 +38,8 @@
                                 </a></li>
                             {% endfor %}
                             </ul>
+
+                            {% endif %}
                             </li>
                         {% endfor %}
                         </ul>
