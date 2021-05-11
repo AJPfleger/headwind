@@ -82,7 +82,7 @@ def load_spec(file: IO[str]) -> Spec:
 class Metric(BaseModel):
     name: str
     group: Optional[str]
-    value: float
+    value: Optional[float]
     unit: str
 
     @validator("group")
@@ -90,6 +90,9 @@ class Metric(BaseModel):
         if v is not None:
             assert len(v) > 0, "Group name cannot be empty"
         return v
+
+    def __hash__(self):
+        return hash(self.name)
 
 
 class CollectorResult(BaseModel):

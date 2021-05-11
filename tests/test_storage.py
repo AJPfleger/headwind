@@ -97,3 +97,25 @@ def test_get_branch_tip(stored_runs: Storage, dummy_runs: List[Run]) -> None:
 
 def test_get_branches(stored_runs: Storage) -> None:
     assert stored_runs.get_branches() == ["main", "feature"]
+
+
+def test_metrics(stored_runs: Storage, dummy_runs: List[Run]) -> None:
+    exp = {}
+    for run in dummy_runs:
+        for m in run.results:
+            m2 = m.copy()
+            m2.value = None
+            if m2.group is not None:
+                exp.setdefault(m2.group, set())
+                exp[m2.group].add(m2)
+            else:
+                exp.setdefault("other", set())
+                exp["other"].add(m2)
+
+    # exp = sorted(exp, key=lambda m: m.name)
+    exp = {k: sorted(v, key=lambda m: m.name) for k, v in exp.items()}
+
+    act = stored_runs.get_metrics()
+    # act = sorted(act, key=lambda m: m.name)
+
+    assert exp == act

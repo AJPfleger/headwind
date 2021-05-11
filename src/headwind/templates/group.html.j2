@@ -1,0 +1,15 @@
+{% extends "base.html.j2" %}
+
+{% block maincol %}
+
+<h1 class="title">
+{{ group }}
+</h1>
+
+<hr/>
+
+{% for plot in plots %}
+<img src="{{ url_for(plot) }}" />
+{% endfor %}
+
+{% endblock %}

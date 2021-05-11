@@ -1,12 +1,13 @@
 import json
 import re
 from pathlib import Path
-from typing import Iterator, Dict, List, Optional
+from typing import Iterator, Dict, List, Optional, Tuple, Union
+from pandas.core.frame import DataFrame
 
 import yaml
 import pandas
 
-from headwind.spec import Run, Commit
+from headwind.spec import Metric, Run, Commit
 
 
 class Storage:
@@ -107,21 +108,48 @@ class Storage:
             current = self.get(current.parent)
             yield current
 
-    def dataframe(self) -> pandas.DataFrame:
+    def get_metrics(self) -> List[Metric]:
+        res = {}
+        for run in self.iterate_all():
+            for m in run.results:
+                m2 = m.copy()
+                m2.value = None
+                g = m2.group if m2.group is not None else "other"
+                res.setdefault(g, set())
+                res[g].add(m2)
+        for g, metrics in res.items():
+            res[g] = sorted(metrics, key=lambda m: m.name)
+        return res
+
+    def dataframe(
+        self, with_metrics: bool = False
+    ) -> Union[pandas.DataFrame, Tuple[pandas.DataFrame, Dict[str, List[Metric]]]]:
         tips = self.find_branch_tips()
         tip: Commit
+
+        res = {}
 
         def iterator() -> Iterator[Dict[str, float]]:
             for tip in tips.values():
                 for run in self.iterate(tip):
-                    # for m in run.results:
-                    #     print(m.name)
                     d = dict([(m.name, m.value) for m in run.results])
                     d["branch"] = run.branch
                     d["commit"] = run.commit.hash
                     d["date"] = run.commit.date
                     d["parent"] = run.parent.hash if run.parent is not None else None
+
+                    if with_metrics:
+                        for m in run.results:
+                            m2 = m.copy()
+                            m2.value = None
+                            g = m2.group if m2.group is not None else "other"
+                            res.setdefault(g, set())
+                            res[g].add(m2)
+
                     yield d
 
         df = pandas.DataFrame.from_records(iterator())
-        return df
+        if with_metrics:
+            return df, res
+        else:
+            return df

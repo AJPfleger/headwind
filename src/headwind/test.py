@@ -7,7 +7,10 @@ from headwind.spec import Run, Commit, Metric
 
 
 def make_commit() -> Commit:
-    return Commit(date=datetime.now(),hash=hashlib.sha1(str(random.random()).encode("utf8")).hexdigest())
+    return Commit(
+        date=datetime.now(),
+        hash=hashlib.sha1(str(random.random()).encode("utf8")).hexdigest(),
+    )
 
 
 def generate_dummy_data(seed: int, n: int, branches: List[str]) -> List[Run]:

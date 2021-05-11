@@ -1,11 +1,57 @@
 <!DOCTYPE html>
 <html>
     <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link href="{{ static_url("css/bulma/bulma.min.css") }}" rel="stylesheet">
         {% block head %}
         {% endblock %}
     </head>
     <body>
-        {% block body %}
-        {% endblock %}
+        <div class="container">
+            <div class="columns is-fullheight">
+            {% block body %}
+                <div class="column is-3-desktop is-one-third-tablet is-12-mobile ">
+                    {# <div class="box"> #}
+                    {% block sidebar %}
+
+                    <aside class="menu section">
+                        <p class="menu-label">Metrics</p>
+                        <ul class="menu-list">
+                        {% for grp, mtrcs in metrics.items() %}
+                            <li><a class="
+                            {%- if group == grp -%}
+                            is-active
+                            {%- endif -%}
+                            " href="{{ group_url(grp) }}">{{ grp }}
+                            </a>
+                            
+                            <ul class="menu-list">
+                            {% for metric in mtrcs %}
+                                <li><a class="
+                                {%- if metric_url(metric) == url_for(current_url()) -%}
+                                is-active
+                                {%- endif -%}
+                                " href="{{ metric_url(metric) }}">{{ metric.name }}
+                                </a></li>
+                            {% endfor %}
+                            </ul>
+                            </li>
+                        {% endfor %}
+                        </ul>
+                    </aside>
+
+                    {% endblock %}
+                    {# </div> #}
+                </div>
+                <div class="column ">
+                    <div class="box mt-5">
+                    {% block maincol %}
+                    {% endblock %}
+                    </div>
+                </div>
+            {% endblock %}
+            </div>
+        </div>
     </body>
 </html>

@@ -98,6 +98,7 @@ def make_test_data(spec_file: typer.FileText, n: int = typer.Option(1, "-n")):
     for run in runs:
         storage.store_run(run)
 
+
 # @app.command("schema")
 # def schema() -> None:
 #     print(CollectorResult.schema_json(indent=2))

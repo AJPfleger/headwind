@@ -1,0 +1,24 @@
+{% extends "base.html.j2" %}
+
+{% block maincol %}
+
+<h1 class="title">
+{{ metric.name }}
+</h1>
+
+<hr/>
+
+{# <nav class="breadcrumb" aria-label="breadcrumbs">
+  <ul>
+    {% for part in current_url().parts %}
+    <li><a href="#">{{ part }}</a></li>
+    {% endfor %}
+  </ul>
+</nav> #}
+
+{% for plot in plots %}
+<img src="{{ url_for(plot) }}" />
+{% endfor %}
+
+
+{% endblock %}
