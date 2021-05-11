@@ -3,7 +3,12 @@ from pathlib import Path
 
 import typer
 from headwind.collector import CollectorError, run_collectors
-from headwind.git import get_current_commit, get_parent_commit, get_branch
+from headwind.git import (
+    get_commit_date,
+    get_current_commit,
+    get_parent_commit,
+    get_branch,
+)
 from headwind.storage import Storage
 from headwind.test import generate_dummy_data
 from headwind.spec import load_spec, Run, Commit
@@ -40,8 +45,13 @@ def collect_cmd(
     ),
     branch: str = typer.Option(get_branch(), "--branch", show_default=True),
 ) -> None:
-    commit = Commit(hash=str(commit_in))
-    parent = Commit(hash=str(parent_in))
+    spec = load_spec(spec_file)
+    storage = Storage(spec.storage_dir)
+
+    commit = Commit(hash=str(commit_in), date=get_commit_date(commit_in))
+    # parent = Commit(hash=str(parent_in), date=get_commit_date(parent_in))
+    parent = storage.get_branch_tip(get_branch())
+    assert commit != parent, "We ran on this commit before it seems"
 
     msg.info(f"#jobs: {jobs}")
     msg.info(f"on commit:     {commit}")
@@ -54,21 +64,20 @@ def collect_cmd(
         )
 
     assert jobs > 0, "Jobs value must be positive"
-    spec = load_spec(spec_file)
 
     msg.good("Spec loaded successfully")
     msg.divider()
 
     try:
-        with msg.loading("Collecting..."):
-            results = run_collectors(spec.collectors, jobs=jobs)
+        results = run_collectors(spec.collectors, jobs=jobs)
     except CollectorError as e:
         msg.fail("Collector returned invalid format")
         typer.echo(str(e.exc))
         return
+        # raise e
 
     msg.good("Collection completed")
-    print(results)
+    # print(results)
 
     run = Run(
         commit=commit,

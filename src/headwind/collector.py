@@ -19,9 +19,13 @@ def run_collector(model: CollectorModel) -> CollectorResult:
     if model.type == CollectorType.Python:
         raise NotImplementedError("Currently not implemented")
     else:
-        result = subprocess.run(
-            model.arg, shell=True, capture_output=True, encoding="utf-8"
-        ).stdout
+        # print("Running", model.arg)
+        # result = subprocess.run(
+        #     model.arg, shell=True, capture_output=True, encoding="utf-8"
+        # ).stdout
+        result = subprocess.check_output(model.arg, shell=True, encoding="utf-8")
+        # print("Raw result:")
+        # print(result)
         try:
             return cast(CollectorResult, CollectorResult.parse_raw(result))
         except pydantic.error_wrappers.ValidationError as e:

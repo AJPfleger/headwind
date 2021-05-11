@@ -9,8 +9,9 @@ import contextlib
 import matplotlib.pyplot as plt
 import numpy as np
 import jinja2
-from headwind.spec import Metric
+from wasabi import msg
 
+from headwind.spec import Metric
 from headwind.storage import Storage
 
 current_depth = 0
@@ -66,11 +67,19 @@ def url_for(url: Union[str, Path]) -> Path:
     return prefix / url
 
 
+def path_sanitize(path: str) -> str:
+    return path.replace("/", "_")
+
+
 static_url = prefix_url("static")
 
 
 def metric_url(metric: Metric) -> Path:
-    return url_for(Path("metric") / (metric.group or "other") / metric.name)
+    return url_for(
+        Path("metric")
+        / path_sanitize(metric.group or "other")
+        / path_sanitize(metric.name)
+    )
 
 
 def group_url(group: str) -> Path:
@@ -101,12 +110,15 @@ def copy_static(output: Path) -> None:
 
 def make_report(storage: Storage, output: Path) -> None:
     print(storage.get_branches())
+    msg.info("Begin")
 
     plot_dir = output / "plots"
     if not plot_dir.exists():
         plot_dir.mkdir(parents=True)
 
+    msg.info("Creating dataframe")
     df, metrics_by_group = storage.dataframe(with_metrics=True)
+    msg.good("Dataframe created")
 
     env = make_environment()
 
@@ -125,6 +137,7 @@ def make_report(storage: Storage, output: Path) -> None:
     group_tpl = env.get_template("group.html.j2")
 
     for group, metrics in metrics_by_group.items():
+        msg.info(f"Group: {group}")
 
         group_plots = []
 
@@ -174,7 +187,12 @@ def make_report(storage: Storage, output: Path) -> None:
                 ax.set_title(f"{metric.name} on {branch}")
 
                 fig.tight_layout()
-                plot_url = plot_dir.relative_to(output) / f"{branch}_{metric.name}.svg"
+                plot_url = (
+                    plot_dir.relative_to(output)
+                    / f"{branch}_{path_sanitize(metric.name)}.svg"
+                )
+                if not plot_url.parent.exists():
+                    plot_url.parent.mkdir(parents=True)
                 fig.savefig(output / plot_url)
                 plt.close(fig)
                 metric_plots.append(plot_url)
@@ -188,7 +206,11 @@ def make_report(storage: Storage, output: Path) -> None:
             bax.legend()
             bax.set_title(f"{metric}")
             bfig.tight_layout()
-            plot_url = plot_dir.relative_to(output) / f"{group}_{branch}.svg"
+            plot_url = (
+                plot_dir.relative_to(output) / f"{group}_{path_sanitize(metric)}.svg"
+            )
+            if not plot_url.parent.exists():
+                plot_url.parent.mkdir(parents=True)
             bfig.savefig(output / plot_url)
             plt.close(bfig)
             group_plots.append(plot_url)

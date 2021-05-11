@@ -126,12 +126,15 @@ class Storage:
     ) -> Union[pandas.DataFrame, Tuple[pandas.DataFrame, Dict[str, List[Metric]]]]:
         tips = self.find_branch_tips()
         tip: Commit
+        # print(tips)
 
         res = {}
 
         def iterator() -> Iterator[Dict[str, float]]:
             for tip in tips.values():
+                # print(tip)
                 for run in self.iterate(tip):
+                    # print(run)
                     d = dict([(m.name, m.value) for m in run.results])
                     d["branch"] = run.branch
                     d["commit"] = run.commit.hash
