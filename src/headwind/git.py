@@ -17,12 +17,26 @@ def get_commit_date(rev: str) -> datetime:
     )
 
 
+def get_commit_message(rev: str) -> str:
+    return subprocess.check_output(
+        ["git", "log", "-n", "1", "--pretty=format:%s", "HEAD"], encoding="utf8"
+    ).strip()
+
+
 def get_current_commit() -> Commit:
-    return Commit(hash=_get_hash("HEAD"), date=get_commit_date("HEAD"))
+    return Commit(
+        hash=_get_hash("HEAD"),
+        date=get_commit_date("HEAD"),
+        message=get_commit_message("HEAD"),
+    )
 
 
 def get_parent_commit() -> Commit:
-    return Commit(hash=_get_hash("HEAD^"), date=get_commit_date("HEAD^"))
+    return Commit(
+        hash=_get_hash("HEAD^"),
+        date=get_commit_date("HEAD^"),
+        message=get_commit_message("HEAD^"),
+    )
 
 
 def get_branch() -> str:

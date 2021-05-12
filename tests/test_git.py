@@ -1,7 +1,7 @@
 import subprocess
 from datetime import datetime
 
-from headwind.git import get_current_commit, get_parent_commit, get_branch
+from headwind.git import get_commit_message, get_current_commit, get_parent_commit, get_branch
 
 
 def test_get_current_commit():
@@ -39,3 +39,11 @@ def test_get_branch():
         ["git", "branch", "--show-current"], encoding="utf8"
     ).strip()
     assert get_branch() == branch
+
+
+def test_get_commit_message():
+    msg = subprocess.check_output(
+        ["git", "log", "-n", "1", "--pretty=format:%s", "HEAD"], encoding="utf8"
+    ).strip()
+
+    assert get_commit_message("HEAD") == msg

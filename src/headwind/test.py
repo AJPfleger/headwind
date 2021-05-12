@@ -5,11 +5,65 @@ from typing import List
 
 from headwind.spec import Run, Commit, Metric
 
+_words = """
+X-ray
+classify
+dine
+release
+move
+fluctuation
+tumble
+mud
+security
+sugar
+therapist
+park
+disability
+other
+clay
+experience
+radical
+offspring
+pitch
+cycle
+withdraw
+emergency
+legislation
+copper
+introduction
+rape
+oven
+default
+embox
+cotton
+linen
+record
+exotic
+extraterrestrial
+effort
+source
+beer
+modest
+full
+decay
+walk
+problem
+policeman
+positive
+mouse
+stain
+reverse
+absorb
+survival
+revoke
+""".strip().splitlines()
+
 
 def make_commit() -> Commit:
     return Commit(
         date=datetime.now(),
         hash=hashlib.sha1(str(random.random()).encode("utf8")).hexdigest(),
+        message=" ".join([random.choice(_words) for _ in range(5)]),
     )
 
 

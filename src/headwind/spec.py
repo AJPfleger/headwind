@@ -108,6 +108,7 @@ class CollectorResult(BaseModel):
 class Commit(BaseModel):
     date: datetime
     hash: str = Field(min_length=40, max_length=40)
+    message: str
 
 
 class Run(BaseModel):

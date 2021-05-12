@@ -9,15 +9,17 @@ from headwind.storage import Storage
 
 
 def test_make_filename() -> None:
-    act = Storage._make_filename(Commit(hash="ABCDEFG" + "Y" * 33, date=datetime.now()))
+    act = Storage._make_filename(
+        Commit(hash="ABCDEFG" + "Y" * 33, date=datetime.now(), message="blub")
+    )
     assert "ABCDEFG" + "Y" * 33 + ".json" == act
 
 
 @pytest.fixture
 def dummy_run() -> Run:
     return Run(
-        commit=Commit(hash="X" * 40, date=datetime.now()),
-        parent=Commit(hash="X" * 40, date=datetime.now()),
+        commit=Commit(hash="X" * 40, date=datetime.now(), message="blubb"),
+        parent=Commit(hash="X" * 40, date=datetime.now(), message="blubb"),
         branch="main",
         date=datetime.now(),
         results=[Metric(name="a.metric", value=42, unit="X")],
@@ -41,7 +43,7 @@ def test_storage(dummy_run: Run, tmp_path: Path) -> None:
     assert run_read == dummy_run
 
     with pytest.raises(AssertionError):
-        storage.get(Commit(hash="J" * 40, date=datetime.now()))
+        storage.get(Commit(hash="J" * 40, date=datetime.now(), message="blubb"))
 
 
 def test_iterate(dummy_runs: List[Run], stored_runs: Storage):
@@ -96,7 +98,7 @@ def test_get_branch_tip(stored_runs: Storage, dummy_runs: List[Run]) -> None:
 
 
 def test_get_branches(stored_runs: Storage) -> None:
-    assert stored_runs.get_branches() == ["main", "feature"]
+    assert sorted(stored_runs.get_branches()) == sorted(["main", "feature"])
 
 
 def test_metrics(stored_runs: Storage, dummy_runs: List[Run]) -> None:

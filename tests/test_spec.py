@@ -106,8 +106,8 @@ def test_collector_result() -> None:
 def test_run() -> None:
     # VALID
     Run(
-        commit=Commit(hash="X" * 40, date=datetime.now()),
-        parent=Commit(hash="X" * 40, date=datetime.now()),
+        commit=Commit(hash="X" * 40, date=datetime.now(), message="blubb"),
+        parent=Commit(hash="X" * 40, date=datetime.now(), message="blubb"),
         branch="main",
         date=datetime.now(),
         results=[Metric(name="a.metric", value=42, unit="X")],

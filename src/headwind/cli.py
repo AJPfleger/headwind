@@ -5,6 +5,7 @@ import typer
 from headwind.collector import CollectorError, run_collectors
 from headwind.git import (
     get_commit_date,
+    get_commit_message,
     get_current_commit,
     get_parent_commit,
     get_branch,
@@ -48,7 +49,11 @@ def collect_cmd(
     spec = load_spec(spec_file)
     storage = Storage(spec.storage_dir)
 
-    commit = Commit(hash=str(commit_in), date=get_commit_date(commit_in))
+    commit = Commit(
+        hash=str(commit_in),
+        date=get_commit_date(commit_in),
+        message=get_commit_message(commit_in),
+    )
     # parent = Commit(hash=str(parent_in), date=get_commit_date(parent_in))
     parent = storage.get_branch_tip(get_branch())
     assert commit != parent, "We ran on this commit before it seems"
