@@ -1,12 +1,15 @@
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, IO, List, Optional, cast
+from typing import Any, Dict, IO, List, Optional, cast, Callable
+import textwrap
+from matplotlib.pyplot import text
 
 from pydantic import BaseModel, validator, Field, root_validator
 import pydantic
 import json
 import yaml
+import pandas
 
 
 class CollectorType(str, Enum):
@@ -22,10 +25,49 @@ class CollectorModel(BaseModel):
         extra = "forbid"
 
 
+class Metric(BaseModel):
+    name: str
+    group: Optional[str]
+    value: Optional[float]
+    unit: str
+
+    @validator("group")
+    def _(cls, v: Optional[str], **kwargs: Any) -> Optional[str]:
+        if v is not None:
+            assert len(v) > 0, "Group name cannot be empty"
+        return v
+
+    def __hash__(self):
+        return hash(self.name)
+
+
+class ReportFilter:
+    fn: Optional[Callable[[Metric, pandas.DataFrame], bool]]
+
+    def __init__(self, fn: Optional[Callable[[Metric, pandas.DataFrame], bool]]):
+        self.fn = fn
+    
+    def __call__(self, metric: Metric, df: pandas.DataFrame) -> bool:
+        if self.fn is None: return True
+        return self.fn(metric, df)
+
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v: str):
+        v = textwrap.dedent(v)
+        l = {}
+        exec(v, {}, l)
+        return cls(l["func"])
+
 class Spec(BaseModel):
     collectors: List[CollectorModel]
     spec_file: Path
     storage_dir: Path
+    report_filter: ReportFilter = ReportFilter(None)
 
     class Config:
         extra = "forbid"
@@ -36,21 +78,6 @@ class Spec(BaseModel):
     ) -> List[CollectorModel]:
         assert len(v) > 0, "At least one collector needs to be given."
         return v
-
-    # @validator("spec_file")
-    # def validate_spec_file(cls, value: Path) -> Path:
-    #     assert value.exists()
-    #     return value
-    #
-    # @validator("storage_dir")
-    # def validate_storage_dir(cls, value: Path, values: Dict[str, Any]) -> Path:
-    #     path = cast(Path, values["spec_file"]).parent / value
-    #     path = path.absolute()
-    #     # assert path.exists(), f"Storage path not found: {path}"
-    #     if not path.exists():
-    #         path.mkdir(parents=True)
-    #     assert path.is_dir(), f"Path {path} is not a directory"
-    #     return path
 
     @root_validator
     def root_validator(slc, values: Dict[str, Any]):
@@ -77,22 +104,6 @@ def load_spec(file: IO[str]) -> Spec:
 
     values["spec_file"] = file.name
     return Spec(**values)
-
-
-class Metric(BaseModel):
-    name: str
-    group: Optional[str]
-    value: Optional[float]
-    unit: str
-
-    @validator("group")
-    def _(cls, v: Optional[str], **kwargs: Any) -> Optional[str]:
-        if v is not None:
-            assert len(v) > 0, "Group name cannot be empty"
-        return v
-
-    def __hash__(self):
-        return hash(self.name)
 
 
 class CollectorResult(BaseModel):

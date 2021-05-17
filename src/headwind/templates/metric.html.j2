@@ -20,5 +20,11 @@
 <img src="{{ url_for(plot) }}" />
 {% endfor %}
 
+<div class="content">
+{% for g, df in dataframe.groupby("branch") %}
+<h2 class="title">{{g}}</h2>
+{{ df[["commit", "date", "value"]].to_html() }}
+{% endfor %}
+</div>
 
 {% endblock %}

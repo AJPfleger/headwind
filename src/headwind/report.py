@@ -5,19 +5,20 @@ from sys import prefix
 from typing import Union
 import functools
 import contextlib
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import matplotlib.pyplot as plt
 import numpy as np
 import jinja2
 from wasabi import msg
 import rich.progress
+import pandas
 
-from headwind.spec import Metric
+from headwind.spec import Metric, Spec
 from headwind.storage import Storage
 
 current_depth = 0
-current_url = None
+current_url = "/"
 
 
 @contextlib.contextmanager
@@ -26,7 +27,6 @@ def push_depth(n: int = 1):
     current_depth += n
     yield
     current_depth -= n
-
 
 @contextlib.contextmanager
 def push_url(url: Path):
@@ -73,7 +73,13 @@ def path_sanitize(path: str) -> str:
     return path.replace("/", "_")
 
 
-static_url = prefix_url("static")
+# static_url = prefix_url("static")
+
+def static_url(url: Union[str, Path]) -> Path:
+    if isinstance(url, str):
+        url = Path(url)
+    assert isinstance(url, Path)
+    return url_for("static" / url)
 
 
 def metric_url(metric: Metric) -> Path:
@@ -91,6 +97,9 @@ def group_url(group: str) -> Path:
 def is_group_active(group: str) -> bool:
     return str(url_for(current_url)).startswith(str(group_url(group)))
 
+def get_current_url():
+    global current_url
+    return current_url
 
 def make_environment() -> jinja2.Environment:
     env = jinja2.Environment(loader=jinja2.PackageLoader(package_name="headwind"))
@@ -100,7 +109,7 @@ def make_environment() -> jinja2.Environment:
     env.globals["group_url"] = group_url
 
     env.globals["url_for"] = url_for
-    env.globals["current_url"] = lambda: current_url
+    env.globals["current_url"] = get_current_url
     env.globals["is_group_active"] = is_group_active
 
     return env
@@ -114,35 +123,117 @@ def copy_static(output: Path) -> None:
         shutil.rmtree(dest)
     shutil.copytree(static, dest)
 
+def process_metric(metric: Metric, df: pandas.DataFrame, output: Path, metrics_by_group 
+):
+    url = metric_url(metric)
+    # print(url)
+    page = output / url / "index.html"
 
-def make_report(storage: Storage, output: Path) -> None:
-    print(storage.get_branches())
-    msg.info("Begin")
-
-    plt.interactive(False)
+    env = make_environment()
+    env.globals["metrics"] = metrics_by_group
 
     plot_dir = output / "plots"
     if not plot_dir.exists():
         plot_dir.mkdir(parents=True)
 
+    metric_tpl = env.get_template("metric.html.j2")
+
+    fs = (15, 5)
+    sl = slice(None, 100)
+
+    if not page.parent.exists():
+        page.parent.mkdir(parents=True)
+
+    metric_plots = []
+
+    bfig, bax = plt.subplots(figsize=fs)
+
+    for branch, bdf in df.groupby("branch"):
+        fig, ax = plt.subplots(figsize=fs)
+        bdf = bdf[::-1]
+        commits = bdf.commit[sl]
+        dates = bdf.date[sl]
+        ci = np.arange(len(commits))
+
+        ax.plot(ci, bdf[metric.name][sl])
+        ax.set_xticks(ci)
+        bax.set_xticks(ci)
+
+        bax.plot(ci, bdf[metric.name][sl], label=branch)
+
+        labels = [
+            d.strftime("%Y-%m-%d") + " - " + c[:7]
+            for c, d in zip(commits, dates)
+        ]
+
+        ax.set_xlabel("Commits")
+        ax.set_ylabel(f"value [{metric.unit}]")
+
+        ax.set_xticklabels(labels, rotation=45, ha="right")
+        bax.set_xticklabels(labels, rotation=45, ha="right")
+
+        ax.set_title(f"{metric.name} on {branch}")
+
+        fig.tight_layout()
+        plot_url = (
+            plot_dir.relative_to(output)
+            / f"{branch}_{path_sanitize(metric.name)}.svg"
+        )
+        if not plot_url.parent.exists():
+            plot_url.parent.mkdir(parents=True)
+        fig.savefig(output / plot_url)
+        plt.close(fig)
+        metric_plots.append(plot_url)
+
+    tpl_df_cols = ["branch", "commit", "date", metric.name]
+    tpl_df = df[tpl_df_cols].copy()
+    tpl_df.commit = tpl_df.commit.str[:7]
+    tpl_df.columns = ["branch", "commit", "date", "value"]
+
+    with push_url(url):
+        page.write_text(
+            metric_tpl.render(metric=metric, plots=metric_plots, dataframe=tpl_df)
+        )
+
+    bax.legend()
+    bax.set_title(f"{metric.name}")
+    bfig.tight_layout()
+    plot_url = (
+        plot_dir.relative_to(output) / f"{metric.group}_{path_sanitize(metric.name)}.svg"
+    )
+    if not plot_url.parent.exists():
+        plot_url.parent.mkdir(parents=True)
+    bfig.savefig(output / plot_url)
+    plt.close(bfig)
+
+    return metric, plot_url
+
+def make_report(spec: Spec, storage: Storage, output: Path) -> None:
+    print(storage.get_branches())
+    msg.info("Begin")
+
+    plt.interactive(False)
+
     msg.info("Creating dataframe")
     df, metrics_by_group = storage.dataframe(with_metrics=True)
+
+    metrics_by_group = {g: list(filter(lambda m: spec.report_filter(m, df), ms)) for g, ms in metrics_by_group.items()}
+
     msg.good("Dataframe created")
 
     env = make_environment()
+    env.globals["metrics"] = metrics_by_group
 
     copy_static(output)
 
-    common = dict(metrics=metrics_by_group)
 
     global current_url
 
     # start page
     tpl = env.get_template("index.html.j2")
     current_url = "/"
-    (output / "index.html").write_text(tpl.render(**common))
+    (output / "index.html").write_text(tpl.render())
 
-    metric_tpl = env.get_template("metric.html.j2")
     group_tpl = env.get_template("group.html.j2")
 
     for group, metrics in metrics_by_group.items():
@@ -150,125 +241,23 @@ def make_report(storage: Storage, output: Path) -> None:
 
         group_plots = []
 
-        fs = (15, 5)
-        sl = slice(None, 100)
 
-        group_figs = {}
+        with ProcessPoolExecutor() as ex:
+            futures = [ex.submit(process_metric, m, 
+            df,
+             output
+             , metrics_by_group
+             ) for m in metrics]
+            for f in rich.progress.track(as_completed(futures), total=len(futures)):
+                metric, plot_url = f.result()
+                group_plots.append(plot_url)
+                print(metric.name)
 
-        for metric in rich.progress.track(metrics):
-            url = metric_url(metric)
-            print(url)
-            page = output / url / "index.html"
-
-            if not page.parent.exists():
-                page.parent.mkdir(parents=True)
-
-            metric_plots = []
-
-            if not metric.name in group_figs:
-                group_figs[metric.name] = plt.subplots(figsize=fs)
-
-            for branch, bdf in df.groupby("branch"):
-                fig, ax = plt.subplots(figsize=fs)
-                _, bax = group_figs[metric.name]
-                commits = bdf.commit[sl]
-                dates = bdf.date[sl]
-                ci = np.arange(len(commits))
-
-                ax.plot(ci, bdf[metric.name][sl])
-                ax.set_xticks(ci)
-                bax.set_xticks(ci)
-
-                bax.plot(ci, bdf[metric.name][sl], label=branch)
-
-                labels = [
-                    d.strftime("%Y-%m-%d") + " - " + c[:7]
-                    for c, d in zip(commits, dates)
-                ]
-
-                ax.set_xlabel("Commits")
-                ax.set_ylabel(f"value [{metric.unit}]")
-
-                ax.set_xticklabels(labels, rotation=45, ha="right")
-                bax.set_xticklabels(labels, rotation=45, ha="right")
-
-                ax.set_title(f"{metric.name} on {branch}")
-
-                fig.tight_layout()
-                plot_url = (
-                    plot_dir.relative_to(output)
-                    / f"{branch}_{path_sanitize(metric.name)}.svg"
-                )
-                if not plot_url.parent.exists():
-                    plot_url.parent.mkdir(parents=True)
-                fig.savefig(output / plot_url)
-                plt.close(fig)
-                metric_plots.append(plot_url)
-
-            with push_url(url):
-                page.write_text(
-                    metric_tpl.render(metric=metric, plots=metric_plots, **common)
-                )
-
-        for metric, (bfig, bax) in group_figs.items():
-            bax.legend()
-            bax.set_title(f"{metric}")
-            bfig.tight_layout()
-            plot_url = (
-                plot_dir.relative_to(output) / f"{group}_{path_sanitize(metric)}.svg"
-            )
-            if not plot_url.parent.exists():
-                plot_url.parent.mkdir(parents=True)
-            bfig.savefig(output / plot_url)
-            plt.close(bfig)
-            group_plots.append(plot_url)
+        # for metric in rich.progress.track(metrics):
+        #     process_metric(metric, df, output, env)
 
         url = group_url(group)
         page = output / url / "index.html"
 
         with push_url(url):
-            page.write_text(group_tpl.render(group=group, plots=group_plots, **common))
-
-    # for branch, bdf in df.groupby("branch"):
-    #     # print(bdf.head())
-    #     # print(bdf.columns)
-    #     for col in bdf.columns:
-    #         # if not col.startswith("metric"): continue
-    #         if col not in metrics:
-    #             continue
-
-    #         url = metric_url(col)
-
-    #         metric_dir = output / url
-    #         if not metric_dir.exists():
-    #             metric_dir.mkdir(parents=True)
-
-    #         page = metric_dir / "index.html"
-
-    #         sl = slice(-50, None)
-    #         # sl = slice(None, None)
-    #         fig, ax = plt.subplots(figsize=(15, 5))
-    #         commits = bdf.commit[sl]
-    #         dates = bdf.date[sl]
-    #         ci = np.arange(len(commits))
-    #         # ax.plot(bdf.date, bdf[col][sl])
-
-    #         ax.plot(ci, bdf[col][sl])
-    #         ax.set_xticks(ci)
-
-    #         labels = [
-    #             d.strftime("%Y-%m-%d") + " - " + c[:7] for c, d in zip(commits, dates)
-    #         ]
-
-    #         ax.set_xticklabels(labels, rotation=45, ha="right")
-
-    #         fig.tight_layout()
-    #         plot_url = plot_dir.relative_to(output) / f"{branch}_{col}.svg"
-    #         fig.savefig(output / plot_url)
-
-    #         tpl = env.get_template("metric.html.j2")
-    #         with push_depth(2):
-    #             with push_url(metric_url(col)):
-    #                 page.write_text(
-    #                     tpl.render(metric=col, plot=plot_url.name, **common)
-    #                 )
+            page.write_text(group_tpl.render(group=group, plots=group_plots))

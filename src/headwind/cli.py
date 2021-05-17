@@ -31,7 +31,7 @@ def publish(
     if not output.exists():
         output.mkdir(parents=True)
 
-    make_report(storage, output)
+    make_report(spec, storage, output)
 
 
 @app.command("collect")
