@@ -5,11 +5,13 @@ from sys import prefix
 from typing import Union
 import functools
 import contextlib
+from concurrent.futures import ThreadPoolExecutor
 
 import matplotlib.pyplot as plt
 import numpy as np
 import jinja2
 from wasabi import msg
+import rich.progress
 
 from headwind.spec import Metric
 from headwind.storage import Storage
@@ -117,6 +119,8 @@ def make_report(storage: Storage, output: Path) -> None:
     print(storage.get_branches())
     msg.info("Begin")
 
+    plt.interactive(False)
+
     plot_dir = output / "plots"
     if not plot_dir.exists():
         plot_dir.mkdir(parents=True)
@@ -147,11 +151,11 @@ def make_report(storage: Storage, output: Path) -> None:
         group_plots = []
 
         fs = (15, 5)
-        sl = slice(-50, None)
+        sl = slice(None, 100)
 
         group_figs = {}
 
-        for metric in metrics:
+        for metric in rich.progress.track(metrics):
             url = metric_url(metric)
             print(url)
             page = output / url / "index.html"
@@ -165,7 +169,6 @@ def make_report(storage: Storage, output: Path) -> None:
                 group_figs[metric.name] = plt.subplots(figsize=fs)
 
             for branch, bdf in df.groupby("branch"):
-
                 fig, ax = plt.subplots(figsize=fs)
                 _, bax = group_figs[metric.name]
                 commits = bdf.commit[sl]
