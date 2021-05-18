@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from headwind.spec import Commit
 
@@ -31,12 +32,17 @@ def get_current_commit() -> Commit:
     )
 
 
-def get_parent_commit() -> Commit:
-    return Commit(
-        hash=_get_hash("HEAD^"),
-        date=get_commit_date("HEAD^"),
-        message=get_commit_message("HEAD^"),
-    )
+def get_parent_commit() -> Optional[Commit]:
+    try:
+        return Commit(
+            hash=_get_hash("HEAD^"),
+            date=get_commit_date("HEAD^"),
+            message=get_commit_message("HEAD^"),
+        )
+    except subprocess.CalledProcessError as e:
+        if e.returncode == 128:
+            return None
+        raise e
 
 
 def get_branch() -> str:

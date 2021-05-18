@@ -41,9 +41,6 @@ def collect_cmd(
     commit_in: str = typer.Option(
         get_current_commit().hash, "--commit", show_default=True
     ),
-    parent_in: str = typer.Option(
-        get_parent_commit().hash, "--parent", show_default=True
-    ),
     branch: str = typer.Option(get_branch(), "--branch", show_default=True),
 ) -> None:
     spec = load_spec(spec_file)
