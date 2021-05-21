@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from re import I
 import shutil
@@ -6,6 +7,7 @@ from typing import Union
 import functools
 import contextlib
 from concurrent.futures import ProcessPoolExecutor, as_completed
+import re
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,6 +29,7 @@ def push_depth(n: int = 1):
     current_depth += n
     yield
     current_depth -= n
+
 
 @contextlib.contextmanager
 def push_url(url: Path):
@@ -75,6 +78,7 @@ def path_sanitize(path: str) -> str:
 
 # static_url = prefix_url("static")
 
+
 def static_url(url: Union[str, Path]) -> Path:
     if isinstance(url, str):
         url = Path(url)
@@ -97,9 +101,43 @@ def group_url(group: str) -> Path:
 def is_group_active(group: str) -> bool:
     return str(url_for(current_url)).startswith(str(group_url(group)))
 
+
 def get_current_url():
     global current_url
     return current_url
+
+
+def smart_truncate(s, n):
+    if len(s) <= n:
+        return s
+
+    if "/" in s:
+        # looks like a path
+        parts = s.split("/")
+        return f"{parts[0]}/.../{parts[-1]}"
+
+    n_2 = int(int(n) / 2 - 3)
+    n_1 = int(n - n_2 - 3)
+    return "{0}...{1}".format(s[:n_1], s[-n_2:])
+
+
+def issue_links(s):
+    def rep(m):
+        num = m.group(1)
+        return f'<a target="blank" href="https://github.com/acts-project/acts/issues/{num}">#{num}</a>'
+
+    r, _ = re.subn(r"#(\d+)", rep, s)
+    return r
+
+
+def first_line(s):
+    return s.split("\n")[0]
+
+
+def dateformat(d, fmt):
+    assert isinstance(d, datetime)
+    return d.strftime(fmt)
+
 
 def make_environment() -> jinja2.Environment:
     env = jinja2.Environment(loader=jinja2.PackageLoader(package_name="headwind"))
@@ -112,6 +150,11 @@ def make_environment() -> jinja2.Environment:
     env.globals["current_url"] = get_current_url
     env.globals["is_group_active"] = is_group_active
 
+    env.filters["smart_truncate"] = smart_truncate
+    env.filters["issue_links"] = issue_links
+    env.filters["first_line"] = first_line
+    env.filters["dateformat"] = dateformat
+
     return env
 
 
@@ -123,7 +166,9 @@ def copy_static(output: Path) -> None:
         shutil.rmtree(dest)
     shutil.copytree(static, dest)
 
-def process_metric(metric: Metric, df: pandas.DataFrame, output: Path, metrics_by_group 
+
+def process_metric(
+    metric: Metric, df: pandas.DataFrame, output: Path, metrics_by_group
 ):
     url = metric_url(metric)
     # print(url)
@@ -150,9 +195,12 @@ def process_metric(metric: Metric, df: pandas.DataFrame, output: Path, metrics_b
 
     for branch, bdf in df.groupby("branch"):
         fig, ax = plt.subplots(figsize=fs)
+        bdf = bdf[sl]
         bdf = bdf[::-1]
-        commits = bdf.commit[sl]
-        dates = bdf.date[sl]
+        commits = bdf.commit
+        dates = bdf.date
+        # commits = bdf.commit[sl]
+        # dates = bdf.date[sl]
         ci = np.arange(len(commits))
 
         ax.plot(ci, bdf[metric.name][sl])
@@ -162,8 +210,7 @@ def process_metric(metric: Metric, df: pandas.DataFrame, output: Path, metrics_b
         bax.plot(ci, bdf[metric.name][sl], label=branch)
 
         labels = [
-            d.strftime("%Y-%m-%d") + " - " + c[:7]
-            for c, d in zip(commits, dates)
+            d.strftime("%Y-%m-%d") + " - " + c[:7] for c, d in zip(commits, dates)
         ]
 
         ax.set_xlabel("Commits")
@@ -176,8 +223,7 @@ def process_metric(metric: Metric, df: pandas.DataFrame, output: Path, metrics_b
 
         fig.tight_layout()
         plot_url = (
-            plot_dir.relative_to(output)
-            / f"{branch}_{path_sanitize(metric.name)}.svg"
+            plot_dir.relative_to(output) / f"{branch}_{path_sanitize(metric.name)}.svg"
         )
         if not plot_url.parent.exists():
             plot_url.parent.mkdir(parents=True)
@@ -185,10 +231,10 @@ def process_metric(metric: Metric, df: pandas.DataFrame, output: Path, metrics_b
         plt.close(fig)
         metric_plots.append(plot_url)
 
-    tpl_df_cols = ["branch", "commit", "date", metric.name]
+    tpl_df_cols = ["branch", "commit", "date", "message", metric.name]
     tpl_df = df[tpl_df_cols].copy()
-    tpl_df.commit = tpl_df.commit.str[:7]
-    tpl_df.columns = ["branch", "commit", "date", "value"]
+    # tpl_df.commit = tpl_df.commit.str[:7]
+    tpl_df.columns = ["branch", "commit", "date", "message", "value"]
 
     with push_url(url):
         page.write_text(
@@ -199,7 +245,8 @@ def process_metric(metric: Metric, df: pandas.DataFrame, output: Path, metrics_b
     bax.set_title(f"{metric.name}")
     bfig.tight_layout()
     plot_url = (
-        plot_dir.relative_to(output) / f"{metric.group}_{path_sanitize(metric.name)}.svg"
+        plot_dir.relative_to(output)
+        / f"{metric.group}_{path_sanitize(metric.name)}.svg"
     )
     if not plot_url.parent.exists():
         plot_url.parent.mkdir(parents=True)
@@ -208,16 +255,20 @@ def process_metric(metric: Metric, df: pandas.DataFrame, output: Path, metrics_b
 
     return metric, plot_url
 
+
 def make_report(spec: Spec, storage: Storage, output: Path) -> None:
     print(storage.get_branches())
-    msg.info("Begin")
+    msg.info("Begin report generation")
 
     plt.interactive(False)
 
     msg.info("Creating dataframe")
     df, metrics_by_group = storage.dataframe(with_metrics=True)
 
-    metrics_by_group = {g: list(filter(lambda m: spec.report_filter(m, df), ms)) for g, ms in metrics_by_group.items()}
+    metrics_by_group = {
+        g: list(filter(lambda m: spec.report_filter(m, df), ms))
+        for g, ms in metrics_by_group.items()
+    }
 
     msg.good("Dataframe created")
 
@@ -225,7 +276,6 @@ def make_report(spec: Spec, storage: Storage, output: Path) -> None:
     env.globals["metrics"] = metrics_by_group
 
     copy_static(output)
-
 
     global current_url
 
@@ -241,17 +291,16 @@ def make_report(spec: Spec, storage: Storage, output: Path) -> None:
 
         group_plots = []
 
-
         with ProcessPoolExecutor() as ex:
-            futures = [ex.submit(process_metric, m, 
-            df,
-             output
-             , metrics_by_group
-             ) for m in metrics]
+            futures = [
+                ex.submit(process_metric, m, df, output, metrics_by_group)
+                for m in metrics
+            ]
             for f in rich.progress.track(as_completed(futures), total=len(futures)):
                 metric, plot_url = f.result()
                 group_plots.append(plot_url)
                 print(metric.name)
+            msg.good(f"Completed group {group}")
 
         # for metric in rich.progress.track(metrics):
         #     process_metric(metric, df, output, env)

@@ -140,6 +140,7 @@ class Storage:
                     d["commit"] = run.commit.hash
                     d["date"] = run.commit.date
                     d["parent"] = run.parent.hash if run.parent is not None else None
+                    d["message"] = run.commit.message
 
                     if with_metrics:
                         for m in run.results:

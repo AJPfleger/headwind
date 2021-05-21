@@ -20,10 +20,44 @@
 <img src="{{ url_for(plot) }}" />
 {% endfor %}
 
-<div class="content">
+<div class="container">
 {% for g, df in dataframe.groupby("branch") %}
 <h2 class="title">{{g}}</h2>
-{{ df[["commit", "date", "value"]].to_html() }}
+
+<table class="table is-fullwidth">
+  <thead>
+    <tr>
+    {% for column in df.columns if not column in ("branch", "value") %}
+      <td>{{ column }}</td>
+    {% endfor %}
+      <td>value [{{ metric.unit }}]<td/>
+    </tr>
+  </thead>
+  <tbody>
+  {% for row in df.itertuples() %}
+    <tr>
+    {# {% for column in df.columns if not column == "branch" %} #}
+      <td>
+        <a href="https://github.com/acts-project/acts/commit/{{row.commit}}" target="blank">
+          {{ row.commit[:7] }}
+        </a>
+      </td>
+      <td>
+      {{ row.date|dateformat("%Y-%m-%d %H:%M") }}
+      </td>
+      <td>
+      {{ row.message|first_line|issue_links }}
+      </td>
+      <td>
+      {{ "%.2f"|format(row.value) }}
+      </td>
+    {# {% endfor %} #}
+    </tr>
+  {% endfor %}
+  <tbody>
+</table>
+
+{# {{ df[["commit", "date", "message", "value"]].to_html(border=0, justify="left", index=False) }} #}
 {% endfor %}
 </div>
 
