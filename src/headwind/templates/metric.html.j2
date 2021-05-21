@@ -16,12 +16,78 @@
   </ul>
 </nav> #}
 
-{% for plot in plots %}
-<img src="{{ url_for(plot) }}" />
-{% endfor %}
+{# {% for plot in plots %} #}
+{% for g, df in dataframe.groupby("branch") %}
+{# <img src="{{ url_for(plot) }}" /> #}
+
+
+<canvas id="myChart" width="400" height="400"></canvas>
+<script>
+var ctx = document.getElementById('myChart').getContext('2d');
+var myChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        datasets: [{
+          label: "{{ metric.name }} on branch {{ branch }}",
+          data: {{ chart_data|tojson }},
+          fill: false,
+          borderColor: 'rgb(75, 192, 192)',
+          tension: 0
+        }]
+    },
+    options: {
+        scales: {
+            y: {
+              beginAtZero: true
+            },
+            x: {
+              reverse: true
+            }
+        },
+        aspectRatio: 2,
+        parsing: true,
+
+        onClick: function(e) {
+          const canvasPosition = Chart.helpers.getRelativePosition(e, e.chart);
+          const idx = e.chart.scales.x.getValueForPixel(canvasPosition.x);
+
+          const ds = e.chart.config._config.data.datasets[0].data[idx];
+          const commit = ds.commit;
+          window.open("https://github.com/{{ github_project }}/commit/"+commit, target="blank");
+        },
+        interaction: {
+          mode: "x"
+        },
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        var label = context.dataset.label || '';
+                        return label;
+                    },
+                    title: function(context) {
+                      return context[0].raw.commit;
+                    },
+                    afterTitle: function(context) {
+                      var f = Math.round(context[0].parsed.y*100)/100; 
+                      return f + " {{ metric.unit }}";
+                    },
+                    beforeBody: function(context) {
+                      return context[0].raw.message;
+                    }
+                }
+            }
+        }
+    },
+});
+</script>
+
+
+
+
+
 
 <div class="container">
-{% for g, df in dataframe.groupby("branch") %}
 <h2 class="title">{{g}}</h2>
 
 <table class="table is-fullwidth">
@@ -38,7 +104,7 @@
     <tr>
     {# {% for column in df.columns if not column == "branch" %} #}
       <td>
-        <a href="https://github.com/acts-project/acts/commit/{{row.commit}}" target="blank">
+        <a href="https://github.com/{{ github_project }}/commit/{{row.commit}}" target="blank">
           {{ row.commit[:7] }}
         </a>
       </td>

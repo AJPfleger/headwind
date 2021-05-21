@@ -121,10 +121,13 @@ def smart_truncate(s, n):
     return "{0}...{1}".format(s[:n_1], s[-n_2:])
 
 
+github_project: str = None
+
+
 def issue_links(s):
     def rep(m):
         num = m.group(1)
-        return f'<a target="blank" href="https://github.com/acts-project/acts/issues/{num}">#{num}</a>'
+        return f'<a target="blank" href="https://github.com/{github_project}/issues/{num}">#{num}</a>'
 
     r, _ = re.subn(r"#(\d+)", rep, s)
     return r
@@ -168,7 +171,11 @@ def copy_static(output: Path) -> None:
 
 
 def process_metric(
-    metric: Metric, df: pandas.DataFrame, output: Path, metrics_by_group
+    metric: Metric,
+    df: pandas.DataFrame,
+    output: Path,
+    metrics_by_group,
+    github_project: str,
 ):
     url = metric_url(metric)
     # print(url)
@@ -176,6 +183,7 @@ def process_metric(
 
     env = make_environment()
     env.globals["metrics"] = metrics_by_group
+    env.globals["github_project"] = github_project
 
     plot_dir = output / "plots"
     if not plot_dir.exists():
@@ -236,9 +244,25 @@ def process_metric(
     # tpl_df.commit = tpl_df.commit.str[:7]
     tpl_df.columns = ["branch", "commit", "date", "message", "value"]
 
+    chart_data = []
+    for row in tpl_df.itertuples():
+        chart_data.append(
+            {
+                "x": f"{row.commit[:7]} {row.date.strftime('%Y-%m-%d')}",
+                "y": row.value,
+                "commit": row.commit,
+                "message": row.message,
+            }
+        )
+
     with push_url(url):
         page.write_text(
-            metric_tpl.render(metric=metric, plots=metric_plots, dataframe=tpl_df)
+            metric_tpl.render(
+                metric=metric,
+                plots=metric_plots,
+                dataframe=tpl_df,
+                chart_data=chart_data,
+            )
         )
 
     bax.legend()
@@ -259,6 +283,8 @@ def process_metric(
 def make_report(spec: Spec, storage: Storage, output: Path) -> None:
     print(storage.get_branches())
     msg.info("Begin report generation")
+    global github_project
+    github_project = spec.github_project
 
     plt.interactive(False)
 
@@ -274,6 +300,7 @@ def make_report(spec: Spec, storage: Storage, output: Path) -> None:
 
     env = make_environment()
     env.globals["metrics"] = metrics_by_group
+    env.globals["github_project"] = spec.github_project
 
     copy_static(output)
 
@@ -293,7 +320,9 @@ def make_report(spec: Spec, storage: Storage, output: Path) -> None:
 
         with ProcessPoolExecutor() as ex:
             futures = [
-                ex.submit(process_metric, m, df, output, metrics_by_group)
+                ex.submit(
+                    process_metric, m, df, output, metrics_by_group, spec.github_project
+                )
                 for m in metrics
             ]
             for f in rich.progress.track(as_completed(futures), total=len(futures)):

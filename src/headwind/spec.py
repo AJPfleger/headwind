@@ -46,11 +46,11 @@ class ReportFilter:
 
     def __init__(self, fn: Optional[Callable[[Metric, pandas.DataFrame], bool]]):
         self.fn = fn
-    
-    def __call__(self, metric: Metric, df: pandas.DataFrame) -> bool:
-        if self.fn is None: return True
-        return self.fn(metric, df)
 
+    def __call__(self, metric: Metric, df: pandas.DataFrame) -> bool:
+        if self.fn is None:
+            return True
+        return self.fn(metric, df)
 
     @classmethod
     def __get_validators__(cls):
@@ -63,11 +63,13 @@ class ReportFilter:
         exec(v, {}, l)
         return cls(l["func"])
 
+
 class Spec(BaseModel):
     collectors: List[CollectorModel]
     spec_file: Path
     storage_dir: Path
     report_filter: ReportFilter = ReportFilter(None)
+    github_project: Optional[str] = None
 
     class Config:
         extra = "forbid"
