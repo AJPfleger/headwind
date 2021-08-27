@@ -121,3 +121,7 @@ def test_metrics(stored_runs: Storage, dummy_runs: List[Run]) -> None:
     # act = sorted(act, key=lambda m: m.name)
 
     assert exp == act
+
+
+def test_count(stored_runs: Storage, dummy_runs: List[Run]) -> None:
+    assert stored_runs.num_runs() == len(dummy_runs)

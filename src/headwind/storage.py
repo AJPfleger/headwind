@@ -1,7 +1,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Iterator, Dict, List, Optional, Tuple, Union
+from typing import Iterator, Dict, List, Optional, Tuple, Union, Callable
 from pandas.core.frame import DataFrame
 
 import yaml
@@ -122,7 +122,9 @@ class Storage:
         return res
 
     def dataframe(
-        self, with_metrics: bool = False
+        self,
+        with_metrics: bool = False,
+        progress_callback: Optional[Callable[[], None]] = None,
     ) -> Union[pandas.DataFrame, Tuple[pandas.DataFrame, Dict[str, List[Metric]]]]:
         tips = self.find_branch_tips()
         tip: Commit
@@ -150,6 +152,8 @@ class Storage:
                             res.setdefault(g, set())
                             res[g].add(m2)
 
+                    if progress_callback is not None:
+                        progress_callback()
                     yield d
 
         df = pandas.DataFrame.from_records(iterator())
@@ -157,3 +161,13 @@ class Storage:
             return df, res
         else:
             return df
+
+    def num_runs(self) -> int:
+        n = 0
+        for f in sorted(self.base_dir.iterdir()):
+            if not f.is_file():
+                continue
+            if f.name.startswith("branch_"):
+                continue
+            n += 1
+        return n

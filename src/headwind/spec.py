@@ -3,7 +3,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, IO, List, Optional, cast, Callable
 import textwrap
-from matplotlib.pyplot import text
 
 from pydantic import BaseModel, validator, Field, root_validator
 import pydantic
@@ -70,6 +69,7 @@ class Spec(BaseModel):
     storage_dir: Path
     report_filter: ReportFilter = ReportFilter(None)
     github_project: Optional[str] = None
+    report_num_commits: int = 100
 
     class Config:
         extra = "forbid"

@@ -9,7 +9,6 @@ import contextlib
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import re
 
-import matplotlib.pyplot as plt
 import numpy as np
 import jinja2
 from wasabi import msg
@@ -176,6 +175,7 @@ def process_metric(
     output: Path,
     metrics_by_group,
     github_project: str,
+    num_commits: int,
 ):
     url = metric_url(metric)
     # print(url)
@@ -184,10 +184,6 @@ def process_metric(
     env = make_environment()
     env.globals["metrics"] = metrics_by_group
     env.globals["github_project"] = github_project
-
-    plot_dir = output / "plots"
-    if not plot_dir.exists():
-        plot_dir.mkdir(parents=True)
 
     metric_tpl = env.get_template("metric.html.j2")
 
@@ -198,46 +194,6 @@ def process_metric(
         page.parent.mkdir(parents=True)
 
     metric_plots = []
-
-    bfig, bax = plt.subplots(figsize=fs)
-
-    for branch, bdf in df.groupby("branch"):
-        fig, ax = plt.subplots(figsize=fs)
-        bdf = bdf[sl]
-        bdf = bdf[::-1]
-        commits = bdf.commit
-        dates = bdf.date
-        # commits = bdf.commit[sl]
-        # dates = bdf.date[sl]
-        ci = np.arange(len(commits))
-
-        ax.plot(ci, bdf[metric.name][sl])
-        ax.set_xticks(ci)
-        bax.set_xticks(ci)
-
-        bax.plot(ci, bdf[metric.name][sl], label=branch)
-
-        labels = [
-            d.strftime("%Y-%m-%d") + " - " + c[:7] for c, d in zip(commits, dates)
-        ]
-
-        ax.set_xlabel("Commits")
-        ax.set_ylabel(f"value [{metric.unit}]")
-
-        ax.set_xticklabels(labels, rotation=45, ha="right")
-        bax.set_xticklabels(labels, rotation=45, ha="right")
-
-        ax.set_title(f"{metric.name} on {branch}")
-
-        fig.tight_layout()
-        plot_url = (
-            plot_dir.relative_to(output) / f"{branch}_{path_sanitize(metric.name)}.svg"
-        )
-        if not plot_url.parent.exists():
-            plot_url.parent.mkdir(parents=True)
-        fig.savefig(output / plot_url)
-        plt.close(fig)
-        metric_plots.append(plot_url)
 
     tpl_df_cols = ["branch", "commit", "date", "message", metric.name]
     tpl_df = df[tpl_df_cols].copy()
@@ -255,6 +211,8 @@ def process_metric(
             }
         )
 
+    chart_data = chart_data[:num_commits]
+
     with push_url(url):
         page.write_text(
             metric_tpl.render(
@@ -265,19 +223,7 @@ def process_metric(
             )
         )
 
-    bax.legend()
-    bax.set_title(f"{metric.name}")
-    bfig.tight_layout()
-    plot_url = (
-        plot_dir.relative_to(output)
-        / f"{metric.group}_{path_sanitize(metric.name)}.svg"
-    )
-    if not plot_url.parent.exists():
-        plot_url.parent.mkdir(parents=True)
-    bfig.savefig(output / plot_url)
-    plt.close(bfig)
-
-    return metric, plot_url
+    return metric
 
 
 def make_report(spec: Spec, storage: Storage, output: Path) -> None:
@@ -286,10 +232,12 @@ def make_report(spec: Spec, storage: Storage, output: Path) -> None:
     global github_project
     github_project = spec.github_project
 
-    plt.interactive(False)
-
-    msg.info("Creating dataframe")
-    df, metrics_by_group = storage.dataframe(with_metrics=True)
+    with rich.progress.Progress() as progress:
+        task = progress.add_task("Creating dataframe", total=storage.num_runs())
+        update = lambda: progress.advance(task)
+        df, metrics_by_group = storage.dataframe(
+            with_metrics=True, progress_callback=update
+        )
 
     metrics_by_group = {
         g: list(filter(lambda m: spec.report_filter(m, df), ms))
@@ -321,13 +269,18 @@ def make_report(spec: Spec, storage: Storage, output: Path) -> None:
         with ProcessPoolExecutor() as ex:
             futures = [
                 ex.submit(
-                    process_metric, m, df, output, metrics_by_group, spec.github_project
+                    process_metric,
+                    m,
+                    df,
+                    output,
+                    metrics_by_group,
+                    spec.github_project,
+                    spec.report_num_commits,
                 )
                 for m in metrics
             ]
             for f in rich.progress.track(as_completed(futures), total=len(futures)):
-                metric, plot_url = f.result()
-                group_plots.append(plot_url)
+                metric = f.result()
                 print(metric.name)
             msg.good(f"Completed group {group}")
 
@@ -338,4 +291,4 @@ def make_report(spec: Spec, storage: Storage, output: Path) -> None:
         page = output / url / "index.html"
 
         with push_url(url):
-            page.write_text(group_tpl.render(group=group, plots=group_plots))
+            page.write_text(group_tpl.render(group=group))
