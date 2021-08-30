@@ -35,4 +35,3 @@ def test_run_collector(monkeypatch: MonkeyPatch) -> None:
         act = run_collector(ret)
 
         assert exp == act
-
