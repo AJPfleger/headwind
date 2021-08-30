@@ -1,7 +1,12 @@
 import subprocess
 from datetime import datetime
 
-from headwind.git import get_commit_message, get_current_commit, get_parent_commit, get_branch
+from headwind.git import (
+    get_commit_message,
+    get_current_commit,
+    get_parent_commit,
+    get_branch,
+)
 
 
 def test_get_current_commit():
@@ -21,11 +26,11 @@ def test_get_current_commit():
 
 def test_get_parent_commit():
     commit = subprocess.check_output(
-        ["git", "rev-parse", "HEAD^"], encoding="utf8"
+        ["git", "rev-parse", "HEAD~"], encoding="utf8"
     ).strip()
     date = datetime.fromisoformat(
         subprocess.check_output(
-            ["git", "show", "-s", "--format=%cI", "HEAD^"], encoding="utf8"
+            ["git", "show", "-s", "--format=%cI", "HEAD~"], encoding="utf8"
         ).strip()
     )
 

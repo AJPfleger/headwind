@@ -35,9 +35,9 @@ def get_current_commit() -> Commit:
 def get_parent_commit() -> Optional[Commit]:
     try:
         return Commit(
-            hash=_get_hash("HEAD^"),
-            date=get_commit_date("HEAD^"),
-            message=get_commit_message("HEAD^"),
+            hash=_get_hash("HEAD~"),
+            date=get_commit_date("HEAD~"),
+            message=get_commit_message("HEAD~"),
         )
     except subprocess.CalledProcessError as e:
         if e.returncode == 128:
