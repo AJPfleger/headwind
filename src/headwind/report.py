@@ -1,15 +1,11 @@
 from datetime import datetime
 from pathlib import Path
-from re import I
 import shutil
-from sys import prefix
 from typing import Union
-import functools
 import contextlib
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import re
 
-import numpy as np
 import jinja2
 from wasabi import msg
 import rich.progress
@@ -187,9 +183,6 @@ def process_metric(
 
     metric_tpl = env.get_template("metric.html.j2")
 
-    fs = (15, 5)
-    sl = slice(None, 100)
-
     if not page.parent.exists():
         page.parent.mkdir(parents=True)
 
@@ -234,7 +227,10 @@ def make_report(spec: Spec, storage: Storage, output: Path) -> None:
 
     with rich.progress.Progress() as progress:
         task = progress.add_task("Creating dataframe", total=storage.num_runs())
-        update = lambda: progress.advance(task)
+
+        def update():
+            progress.advance(task)
+
         df, metrics_by_group = storage.dataframe(
             with_metrics=True, progress_callback=update
         )
@@ -263,8 +259,6 @@ def make_report(spec: Spec, storage: Storage, output: Path) -> None:
 
     for group, metrics in metrics_by_group.items():
         msg.info(f"Group: {group}")
-
-        group_plots = []
 
         with ProcessPoolExecutor() as ex:
             futures = [

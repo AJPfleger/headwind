@@ -2,9 +2,7 @@ import json
 import re
 from pathlib import Path
 from typing import Iterator, Dict, List, Optional, Tuple, Union, Callable
-from pandas.core.frame import DataFrame
 
-import yaml
 import pandas
 
 from headwind.spec import Metric, Run, Commit

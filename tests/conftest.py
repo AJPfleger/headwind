@@ -1,10 +1,5 @@
-import hashlib
-from datetime import datetime
-
 import pytest
-import random
 
-from headwind.spec import Commit, Run, Metric
 from headwind.storage import Storage
 
 from headwind.test import generate_dummy_data

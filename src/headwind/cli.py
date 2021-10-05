@@ -1,6 +1,5 @@
 from datetime import datetime
 from pathlib import Path
-from typing import List
 
 import typer
 from headwind.collector import CollectorError, run_collectors
@@ -8,7 +7,6 @@ from headwind.git import (
     get_commit_date,
     get_commit_message,
     get_current_commit,
-    get_parent_commit,
     get_branch,
 )
 from headwind.storage import Storage

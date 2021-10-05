@@ -1,7 +1,6 @@
-import io
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, mock_open
+from unittest.mock import mock_open
 
 import pytest
 import pydantic
@@ -11,7 +10,6 @@ from headwind.spec import (
     CollectorType,
     SpecValidationError,
     load_spec,
-    Spec,
     CollectorResult,
     Metric,
     Run,

@@ -58,9 +58,9 @@ class ReportFilter:
     @classmethod
     def validate(cls, v: str):
         v = textwrap.dedent(v)
-        l = {}
-        exec(v, {}, l)
-        return cls(l["func"])
+        loc = {}
+        exec(v, {}, loc)
+        return cls(loc["func"])
 
 
 class Spec(BaseModel):
