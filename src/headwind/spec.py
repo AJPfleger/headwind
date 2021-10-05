@@ -123,6 +123,9 @@ class Commit(BaseModel):
     hash: str = Field(min_length=40, max_length=40)
     message: str
 
+    def __str__(self) -> str:
+        return f'Commit(date={self.date:%Y-%m-%dT%H:%M:%S}, hash={self.hash[:8]}, message="{self.message}")'
+
 
 class Run(BaseModel):
     commit: Commit
