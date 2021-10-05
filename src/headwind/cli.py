@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+from typing import List
 
 import typer
 from headwind.collector import CollectorError, run_collectors
@@ -32,6 +33,20 @@ def publish(
         output.mkdir(parents=True)
 
     make_report(spec, storage, output)
+
+
+@app.command("list")
+def do_list(
+    spec_file: typer.FileText,
+) -> None:
+    spec = load_spec(spec_file)
+    storage = Storage(spec.storage_dir)
+
+    tips = storage.find_branch_tips()
+    for key, tip in tips.items():
+        print(key)
+        for i in storage.iterate(tip):
+            print("-", i.commit.hash[:8], i.commit.date, i.commit.message)
 
 
 @app.command("collect")
