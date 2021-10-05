@@ -103,9 +103,22 @@ class Storage:
 
     def iterate(self, start: Commit) -> Iterator[Run]:
         current = self.get(start)
+        buffer = [None] * 50
+        i = 0
+        buffer[0] = current.commit.hash
+        i += 1
+
         yield current
         while current.parent is not None:
             current = self.get(current.parent)
+
+            if current.commit.hash in buffer:
+                raise RuntimeError(
+                    f"Cycle in commit sequence detected: \n{current.commit}"
+                )
+
+            buffer[i % len(buffer)] = current.commit.hash
+            i += 1
             yield current
 
     def get_metrics(self) -> List[Metric]:
@@ -154,6 +167,7 @@ class Storage:
 
                     if progress_callback is not None:
                         progress_callback()
+                    print(d["message"])
                     yield d
 
         df = pandas.DataFrame.from_records(iterator())
